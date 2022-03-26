@@ -9,10 +9,10 @@ import time
 os.environ['MASTER_ADDR'] = '155.198.152.17'
 os.environ['MASTER_PORT'] = '5678'
 
-#os.environ["NCCL_SOCKET_IFNAME"] = "eth0"
-#os.environ["TP_SOCKET_IFNAME"] = "eth0"
-#os.environ["GLOO_SOCKET_IFNAME"] = "eth0"
-#os.environ["TP_VERBOSE_LOGGING"] = "0"
+os.environ["NCCL_SOCKET_IFNAME"] = "eth0"
+os.environ["TP_SOCKET_IFNAME"] = "eth0"
+os.environ["GLOO_SOCKET_IFNAME"] = "eth0"
+os.environ["TP_VERBOSE_LOGGING"] = "0"
 
 
 
