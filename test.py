@@ -25,9 +25,10 @@ else:
 
 
 
-NUM_ELEMENT = 10000
+NUM_ELEMENT = 1000000
 FEATURE_DIM = 600
-SAMPLE_SIZE = 8000
+
+SAMPLE_SIZE = 80000
 rank = args.rank
 
 #########################
