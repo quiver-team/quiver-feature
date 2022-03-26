@@ -52,6 +52,7 @@ class FeatureServer(object):
         rpc.init_rpc(f"worker{rank}", rank=self.rank, world_size= world_size, rpc_backend_options=rpc_option)
 
     def collect(self, nodes):
+        nodes -= self.range_list[self.rank].start
         torch.cuda.set_device(self.rank)
         data = self.shard_tensor[nodes]
 
