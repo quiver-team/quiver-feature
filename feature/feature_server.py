@@ -39,8 +39,6 @@ def collect(nodes):
 
 @Singleton
 class FeatureServer(object):
-    shard_tensor:ShardTensor
-    range_list: List[Range]
 
     def __init__(self):
         pass
@@ -53,7 +51,9 @@ class FeatureServer(object):
         rpc.init_rpc(f"worker{rank}", rank=self.rank, world_size= world_size, rpc_backend_options=rpc_option)
 
     def collect(self, nodes):
+        torch.cuda.set_device(self.rank)
         data = self.shard_tensor[nodes]
+
         return data
 
 
