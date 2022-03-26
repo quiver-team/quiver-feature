@@ -17,9 +17,9 @@ parser.add_argument('-rank', type=int, help='rank')
 args = parser.parse_args()
 
 if args.rank == 0:
-    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps={"worker1":{0:1}})
+    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps={"worker1":{0:1}, "worker0": {1:0}})
 else:
-    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps={"worker0":{1:0}})
+    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps={"worker1":{0:1}, "worker0": {1:0}})
 
 
 
@@ -41,11 +41,15 @@ shard_tensor_config = ShardTensorConfig({})
 shard_tensor = ShardTensor(rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
 range_list = [Range(0, NUM_ELEMENT), Range(NUM_ELEMENT, 2 * NUM_ELEMENT)]
-feature_server = FeatureServer(2, rank, tensor, range_list, None)
+host_indice = np.random.randint(0, 2 * NUM_ELEMENT - 1, (SAMPLE_SIZE, ))
+indices = torch.from_numpy(host_indice).type(torch.long)
+
+tensor = tensor.to(rank)
+indices = indices.to(rank)
+
+feature_server = FeatureServer(2, rank, tensor, range_list, rpc_option)
 
 if rank == 0:
-    host_indice = np.random.randint(0, 2 * NUM_ELEMENT - 1, (SAMPLE_SIZE, ))
-    indices = torch.from_numpy(host_indice).type(torch.long)
     for idx in range(5):
         data = feature_server[indices]
     print("finished")

@@ -60,7 +60,7 @@ class FeatureServer(object):
     def __getitem__(self, nodes):
 
         task_list: List[Task] = []
-        input_orders = torch.arange(nodes.size(0), dtype=torch.long)
+        input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
         feature = self.shard_tensor[nodes]
 
         for worker_id, range in enumerate(self.range_list):
@@ -74,5 +74,4 @@ class FeatureServer(object):
         for task in task_list:
             task.wait()
             feature[task.prev_order] = task.data
-        
         return feature
