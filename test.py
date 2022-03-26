@@ -8,7 +8,9 @@ import time
 
 os.environ['MASTER_ADDR'] = '155.198.152.17'
 os.environ['MASTER_PORT'] = '5678'
-
+os.environ["NCCL_SOCKET_IFNAME"] = "eth0"
+os.environ["TP_SOCKET_IFNAME"] = "eth0"
+os.environ["GLOO_SOCKET_IFNAME"] = "eth0"
 
 
 parser = argparse.ArgumentParser(description='Assign worker rank')
@@ -23,7 +25,7 @@ else:
 
 
 
-NUM_ELEMENT = 100000
+NUM_ELEMENT = 10000
 FEATURE_DIM = 600
 SAMPLE_SIZE = 8000
 rank = args.rank
@@ -52,8 +54,10 @@ feature_server = FeatureServer(2, rank, shard_tensor, range_list, rpc_option)
 if rank == 0:
     for idx in range(5):
         data = feature_server[indices]
+    torch.cuda.synchronize()
     start = time.time()
     data = feature_server[indices]
+    torch.cuda.synchronize()
     print(f"Bandwidth in Rank 0 = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / (time.time() - start)}GB/s")
     print("finished")
     time.sleep(30)
@@ -62,8 +66,11 @@ if rank == 0:
 else:
     for idx in range(5):
         data = feature_server[indices]
+    torch.cuda.synchronize()
     start = time.time()
     data = feature_server[indices]
+    torch.cuda.synchronize()
+
     print(f"Bandwidth in Rank 1 = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / (time.time() - start)}GB/s")
     print("finished")
     time.sleep(30)

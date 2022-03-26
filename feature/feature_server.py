@@ -3,6 +3,7 @@ import torch
 from collections import namedtuple
 from typing import List
 from quiver.shard_tensor import ShardTensor, ShardTensorConfig
+import time
 Range = namedtuple("Range", ["start", "end"])
 
 class Task:
@@ -62,6 +63,7 @@ class FeatureServer(object):
         task_list: List[Task] = []
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
+        start = time.time()
         for worker_id, range in enumerate(self.range_list):
             if worker_id != self.rank:
                 request_nodes_mask = (nodes >= range.start) & (nodes < range.end)
@@ -69,10 +71,15 @@ class FeatureServer(object):
                 part_orders = torch.masked_select(input_orders, request_nodes_mask)
                 fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
                 task_list.append(Task(part_orders, fut))
+        print("request dispatching time = ", time.time() - start)
         
+        start = time.time()
         feature = self.shard_tensor[nodes]
+        print("local collect = ", time.time() - start)
         
+        start = time.time()
         for task in task_list:
             task.wait()
             feature[task.prev_order] = task.data
+        print("network waiting = ", time.time() - start)
         return feature
