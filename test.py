@@ -57,28 +57,14 @@ device_tensor = tensor.to(rank)
 
 feature_server = FeatureServer(2, rank, shard_tensor, range_list, rpc_option)
 
-if rank == 0:
-    for idx in range(5):
-        data = feature_server[indices]
-    torch.cuda.synchronize()
-    start = time.time()
+for idx in range(5):
     data = feature_server[indices]
-    torch.cuda.synchronize()
-    consumed_time = time.time() - start
-    print(f"Bandwidth in Rank 0 = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time }GB/s")
-    print("finished")
-    time.sleep(30)
-    
-
-else:
-    
-    for idx in range(5):
-        data = feature_server[indices]
-    torch.cuda.synchronize()
-    start = time.time()
-    data = feature_server[indices]
-    torch.cuda.synchronize()
-    print(f"Bandwidth in Rank 1 = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / (time.time() - start)}GB/s")
-    print("finished")
-    time.sleep(30)
+torch.cuda.synchronize()
+start = time.time()
+data = feature_server[indices]
+torch.cuda.synchronize()
+consumed_time = time.time() - start
+print(f"Bandwidth in Rank 0 = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time }GB/s")
+print("finished")
+time.sleep(30)
 
