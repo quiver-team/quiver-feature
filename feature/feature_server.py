@@ -52,10 +52,9 @@ class FeatureServer(object):
         rpc.init_rpc(f"worker{rank}", rank=self.rank, world_size= world_size, rpc_backend_options=rpc_option)
 
     def collect(self, nodes):
-        nodes -= self.range_list[self.rank].start
         torch.cuda.set_device(self.rank)
+        nodes -= self.range_list[self.rank].start
         data = self.shard_tensor[nodes]
-
         return data
 
 
@@ -64,14 +63,16 @@ class FeatureServer(object):
         task_list: List[Task] = []
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
+        
         start = time.time()
         for worker_id, range in enumerate(self.range_list):
             if worker_id != self.rank:
                 request_nodes_mask = (nodes >= range.start) & (nodes < range.end)
                 request_nodes = torch.masked_select(nodes, request_nodes_mask)
-                part_orders = torch.masked_select(input_orders, request_nodes_mask)
-                fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
-                task_list.append(Task(part_orders, fut))
+                if request_nodes.shape[0] > 0:
+                    part_orders = torch.masked_select(input_orders, request_nodes_mask)
+                    fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
+                    task_list.append(Task(part_orders, fut))
         print("request dispatching time = ", time.time() - start)
         
         start = time.time()
