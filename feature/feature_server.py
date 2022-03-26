@@ -61,7 +61,6 @@ class FeatureServer(object):
 
         task_list: List[Task] = []
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
-        feature = self.shard_tensor[nodes]
 
         for worker_id, range in enumerate(self.range_list):
             if worker_id != self.rank:
@@ -70,6 +69,8 @@ class FeatureServer(object):
                 part_orders = torch.masked_select(input_orders, request_nodes_mask)
                 fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
                 task_list.append(Task(part_orders, fut))
+        
+        feature = self.shard_tensor[nodes]
         
         for task in task_list:
             task.wait()
