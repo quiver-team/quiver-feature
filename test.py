@@ -28,8 +28,8 @@ parser.add_argument('-rank', type=int, help='rank')
 parser.add_argument('-local_rank', type=int, default=0, help="local rank")
 parser.add_argument('-world_size', type=int, help="world size")
 parser.add_argument("-device_per_node", type=int, default=1, help ="device per node")
-parser.add_argument("-test_cpu_collection", type=bool, default=False, help ="test for cpu collection")
-parser.add_argument("-test_ib", type=bool, default=True, help ="test IB")
+parser.add_argument("-test_cpu_collection", type=int, default=0, help ="test for cpu collection")
+parser.add_argument("-test_ib", type=int, default=1, help ="test IB")
 
 args = parser.parse_args()
 device_map = {}
@@ -52,15 +52,19 @@ V0327 07:52:54.276447 2716381 tensorpipe/core/context_impl.cc:104] Context worke
 V0327 07:52:54.278730 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel mpt_uv
 """
 if args.test_cpu_collection and args.test_ib:
+    # python3 test.py -test_cpu_collection 1 -test_ib 1 
     print("Transports: IBV, Channel: BASIC")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['basic'])
 elif args.test_cpu_collection:
+    # python3 test.py -test_cpu_collection 1 -test_ib 0
     print("Transports: UV, Channel: MPT_UV")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['mpt_uv'])
 elif args.test_ib:
+     # python3 test.py -test_cpu_collection 0 -test_ib 1
     print("Transports: IBV, Channel: CUDA_BASIC")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
 else:
+      # python3 test.py -test_cpu_collection 0 -test_ib 0
     print("Transports: UV, Channel: CUDA_BASIC")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['cuda_basic'])
 
