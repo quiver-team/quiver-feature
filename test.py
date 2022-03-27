@@ -72,7 +72,5 @@ start = time.time()
 data = feature_server[indices]
 torch.cuda.synchronize()
 consumed_time = time.time() - start
-print(f"Bandwidth in Rank 0 = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time }GB/s")
-print("finished")
-time.sleep(30)
+print(f"Bandwidth in Rank {args.rank} = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time }GB/s")
 

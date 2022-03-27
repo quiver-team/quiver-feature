@@ -86,3 +86,6 @@ class FeatureServer(object):
             feature[task.prev_order] = task.data
         print("network waiting = ", time.time() - start)
         return feature
+    
+    def __del__(self):
+        rpc.shutdown()
