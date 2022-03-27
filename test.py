@@ -23,12 +23,13 @@ os.environ["TP_VERBOSE_LOGGING"] = "0"
 
 
 
-parser = argparse.ArgumentParser(description='python3 test.py -rank x -world_size x  -test_cpu_collection True for test CPU')
+parser = argparse.ArgumentParser(description='python3 test.py -rank x -world_size x  -cpu_collect True for test CPU')
 parser.add_argument('-rank', type=int, help='rank')
 parser.add_argument('-local_rank', type=int, default=0, help="local rank")
 parser.add_argument('-world_size', type=int, help="world size")
 parser.add_argument("-device_per_node", type=int, default=1, help ="device per node")
-parser.add_argument("-test_cpu_collection", type=int, default=0, help ="test for cpu collection")
+parser.add_argument("-cpu_collect", type=int, default=0, help ="test for cpu collection")
+parser.add_argument("-cpu_collect_gpu_send", type=int, default=0, help ="send from gpu")
 parser.add_argument("-test_ib", type=int, default=1, help ="test IB")
 
 args = parser.parse_args()
@@ -37,7 +38,7 @@ for idx in range(args.world_size):
     for device_idx in range(args.device_per_node):
         device_map[f"worker{idx}"] = {device_idx: device_idx}
 
-print(f"Rank {args.rank}: Test Mode Is {'CPU' if args.test_cpu_collection else 'GPU'}")
+print(f"Rank {args.rank}: Test Mode Is {'CPU' if args.cpu_collect else 'GPU'}")
 """
 All transports and channels we have:
 
@@ -51,23 +52,31 @@ V0327 07:52:54.276424 2716381 tensorpipe/core/context_impl.cc:104] Context worke
 V0327 07:52:54.276447 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel basic
 V0327 07:52:54.278730 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel mpt_uv
 """
-if args.test_cpu_collection and args.test_ib:
-    # python3 test.py -test_cpu_collection 1 -test_ib 1 
+
+if args.cpu_collect and args.test_ib:
+    # python3 test.py -cpu_collect 1 -test_ib 1 
     print("Transports: IBV, Channel: BASIC")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['basic'])
-elif args.test_cpu_collection:
-    # python3 test.py -test_cpu_collection 1 -test_ib 0
+elif args.cpu_collect:
+    # python3 test.py -cpu_collect 1 -test_ib 0
     print("Transports: UV, Channel: MPT_UV")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['mpt_uv'])
 elif args.test_ib:
-     # python3 test.py -test_cpu_collection 0 -test_ib 1
+     # python3 test.py -cpu_collect 0 -test_ib 1
     print("Transports: IBV, Channel: CUDA_BASIC")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
 else:
-      # python3 test.py -test_cpu_collection 0 -test_ib 0
+      # python3 test.py -cpu_collect 0 -test_ib 0
     print("Transports: UV, Channel: CUDA_BASIC")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['cuda_basic'])
 
+if args.cpu_collect and args.cpu_collect_gpu_send:
+
+    # python3 test.py -cpu_collect 1 -test_ib 1 -cpu_collect_gpu_send 1
+    print("CPU Collect and GPU Send,  Update To: Transports: IBV, Channel: CUDA_BASIC")
+    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
+
+debug_param = {"cpu_collect_gpu_send": args.cpu_collect_gpu_send}
 
 
 NUM_ELEMENT = 1000000
@@ -83,7 +92,7 @@ host_tensor = np.random.randint(0,
                                 high=10,
                                 size=(NUM_ELEMENT, FEATURE_DIM))
 tensor = torch.from_numpy(host_tensor).type(torch.float32)
-shard_tensor_config = ShardTensorConfig({args.local_rank:"2G"})
+shard_tensor_config = ShardTensorConfig({})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
 range_list = [Range(NUM_ELEMENT * idx, NUM_ELEMENT * (idx + 1)) for idx in range(args.world_size)]
@@ -92,11 +101,13 @@ indices = torch.from_numpy(host_indice).type(torch.long)
 
 
 # TODO Just For Debugging
-if args.test_cpu_collection:
-    feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, tensor, range_list, rpc_option)
-else:
+if args.cpu_collect_gpu_send or not args.cpu_collect:
     indices = indices.to(args.local_rank)
-    feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, shard_tensor, range_list, rpc_option)
+
+if args.cpu_collect:
+    feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, tensor, range_list, rpc_option, **debug_param)
+else:
+    feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, shard_tensor, range_list, rpc_option, **debug_param)
 
 for idx in range(5):
     data = feature_server[indices]

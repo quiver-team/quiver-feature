@@ -44,20 +44,25 @@ class FeatureServer(object):
     def __init__(self):
         pass
 
-    def init(self, world_size, rank, local_rank, shard_tensor, range_list: List[Range], rpc_option) -> None:
+    def init(self, world_size, rank, local_rank, shard_tensor, range_list: List[Range], rpc_option, **debug_params) -> None:
         self.shard_tensor = shard_tensor
         self.range_list = range_list
         self.rank = rank
         self.local_rank = local_rank
         self.world_size = world_size
+        self.debug_params = debug_params
+        
         rpc.init_rpc(f"worker{rank}", rank=self.rank, world_size= world_size, rpc_backend_options=rpc_option)
 
     def collect(self, nodes):
         # TODO Just For Debugging
         if nodes.is_cuda:
             torch.cuda.set_device(self.local_rank)
+        
         nodes -= self.range_list[self.rank].start
         data = self.shard_tensor[nodes]
+        if self.debug_params.get("cpu_collect_gpu_send", 0):
+            data = data.to(self.local_rank)
         return data
 
 
@@ -79,7 +84,11 @@ class FeatureServer(object):
         print("request dispatching time = ", time.time() - start)
         
         start = time.time()
-        if nodes.is_cuda:
+
+        if self.debug_params.get("cpu_collect_gpu_send", 0):
+            feature = torch.empty(nodes.shape[0], self.shard_tensor.shape[1], device = nodes.device)
+
+        elif nodes.is_cuda:
             feature = self.shard_tensor[nodes]
         else:
             # TODO: Just For Debugging
