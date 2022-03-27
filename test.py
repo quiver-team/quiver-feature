@@ -5,6 +5,8 @@ from quiver.shard_tensor import ShardTensorConfig, ShardTensor
 import argparse
 import os
 import time
+import torch.distributed.rpc as rpc
+
 
 """
 1. CPU & IB
@@ -73,4 +75,4 @@ data = feature_server[indices]
 torch.cuda.synchronize()
 consumed_time = time.time() - start
 print(f"Bandwidth in Rank {args.rank} = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time }GB/s")
-
+rpc.shutdown()
