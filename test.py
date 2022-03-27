@@ -59,7 +59,7 @@ shard_tensor_config = ShardTensorConfig({args.local_rank:"2G"})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
 range_list = [Range(NUM_ELEMENT * idx, NUM_ELEMENT * (idx + 1)) for idx in range(args.world_size)]
-host_indice = np.random.randint(0, high= 2 * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
+host_indice = np.random.randint(0, high= args.world_size * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
 indices = torch.from_numpy(host_indice).type(torch.long)
 
 indices = indices.to(args.local_rank)
