@@ -52,12 +52,16 @@ V0327 07:52:54.276447 2716381 tensorpipe/core/context_impl.cc:104] Context worke
 V0327 07:52:54.278730 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel mpt_uv
 """
 if args.test_cpu_collection and args.test_ib:
+    print("Transports: IBV, Channel: BASIC")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['basic'])
 elif args.test_cpu_collection:
+    print("Transports: UV, Channel: MPT_UV")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['mpt_uv'])
 elif args.test_ib:
+    print("Transports: IBV, Channel: CUDA_BASIC")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
 else:
+    print("Transports: UV, Channel: CUDA_BASIC")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['cuda_basic'])
 
 
