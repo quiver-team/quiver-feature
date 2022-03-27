@@ -23,12 +23,13 @@ os.environ["TP_VERBOSE_LOGGING"] = "0"
 
 
 
-parser = argparse.ArgumentParser(description='Assign worker rank')
+parser = argparse.ArgumentParser(description='python3 test.py -rank x -world_size x  -test_cpu_collection True for test CPU')
 parser.add_argument('-rank', type=int, help='rank')
 parser.add_argument('-local_rank', type=int, default=0, help="local rank")
 parser.add_argument('-world_size', type=int, help="world size")
 parser.add_argument("-device_per_node", type=int, default=1, help ="device per node")
 parser.add_argument("-test_cpu_collection", type=bool, default=False, help ="test for cpu collection")
+parser.add_argument("-test_ib", type=bool, default=True, help ="test IB")
 
 args = parser.parse_args()
 device_map = {}
@@ -37,7 +38,28 @@ for idx in range(args.world_size):
         device_map[f"worker{idx}"] = {device_idx: device_idx}
 
 print(f"Rank {args.rank}: Test Mode Is {'CPU' if args.test_cpu_collection else 'GPU'}")
-rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=["ibv"], _channels=["basic"])
+"""
+All transports and channels we have:
+
+V0327 07:52:54.252611 2716381 tensorpipe/core/context_impl.cc:81] Context worker0 is registering transport ibv
+V0327 07:52:54.252761 2716381 tensorpipe/core/context_impl.cc:81] Context worker0 is registering transport uv
+V0327 07:52:54.261135 2716381 tensorpipe/core/context_impl.cc:81] Context worker0 is registering transport shm
+V0327 07:52:54.261295 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel cuda_basic
+V0327 07:52:54.262006 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel cuda_xth
+V0327 07:52:54.262173 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel cma
+V0327 07:52:54.276424 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel cuda_ipc
+V0327 07:52:54.276447 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel basic
+V0327 07:52:54.278730 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel mpt_uv
+"""
+if args.test_cpu_collection and args.test_ib:
+    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['basic'])
+elif args.test_cpu_collection:
+    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['mpt_uv'])
+elif args.test_ib:
+    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
+else:
+    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['cuda_basic'])
+
 
 
 NUM_ELEMENT = 1000000
