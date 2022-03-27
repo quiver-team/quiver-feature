@@ -96,7 +96,7 @@ if args.test_cpu_collection:
     feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, tensor, range_list, rpc_option)
 else:
     indices = indices.to(args.local_rank)
-    feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, tensor, range_list, rpc_option)
+    feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, shard_tensor, range_list, rpc_option)
 
 for idx in range(5):
     data = feature_server[indices]
