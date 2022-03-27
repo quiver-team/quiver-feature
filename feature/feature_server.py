@@ -53,7 +53,9 @@ class FeatureServer(object):
         rpc.init_rpc(f"worker{rank}", rank=self.rank, world_size= world_size, rpc_backend_options=rpc_option)
 
     def collect(self, nodes):
-        torch.cuda.set_device(self.local_rank)
+        # TODO Just For Debugging
+        if nodes.is_cuda:
+            torch.cuda.set_device(self.local_rank)
         nodes -= self.range_list[self.rank].start
         data = self.shard_tensor[nodes]
         return data
@@ -77,7 +79,12 @@ class FeatureServer(object):
         print("request dispatching time = ", time.time() - start)
         
         start = time.time()
-        feature = self.shard_tensor[nodes]
+        if nodes.is_cuda:
+            feature = self.shard_tensor[nodes]
+        else:
+            # TODO: Just For Debugging
+            feature = torch.empty(nodes.shape[0], self.shard_tensor.shape[1])
+
         print("local collect = ", time.time() - start)
         
         start = time.time()

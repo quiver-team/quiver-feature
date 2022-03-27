@@ -28,27 +28,25 @@ parser.add_argument('-rank', type=int, help='rank')
 parser.add_argument('-local_rank', type=int, default=0, help="local rank")
 parser.add_argument('-world_size', type=int, help="world size")
 parser.add_argument("-device_per_node", type=int, default=1, help ="device per node")
+parser.add_argument("-test_cpu_collection", type=bool, default=False, help ="test for cpu collection")
+
 args = parser.parse_args()
 device_map = {}
 for idx in range(args.world_size):
     for device_idx in range(args.device_per_node):
         device_map[f"worker{idx}"] = {device_idx: device_idx}
 
-print(device_map)
-
-rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map)
+print(f"Rank {args.rank}: Test Mode Is {'CPU' if args.test_cpu_collection else 'GPU'}")
+rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=["ibv"], _channels=["basic"])
 
 
 NUM_ELEMENT = 1000000
 FEATURE_DIM = 600
-
 SAMPLE_SIZE = 80000
-rank = args.rank
 
 #########################
 # Init With Numpy
 ########################
-print("Check Rank  = ", rank)
 torch.cuda.set_device(args.local_rank)
 
 host_tensor = np.random.randint(0,
@@ -62,10 +60,13 @@ range_list = [Range(NUM_ELEMENT * idx, NUM_ELEMENT * (idx + 1)) for idx in range
 host_indice = np.random.randint(0, high= args.world_size * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
 indices = torch.from_numpy(host_indice).type(torch.long)
 
-indices = indices.to(args.local_rank)
-device_tensor = tensor.to(args.local_rank)
 
-feature_server = FeatureServer(args.world_size, rank, args.local_rank, shard_tensor, range_list, rpc_option)
+# TODO Just For Debugging
+if args.test_cpu_collection:
+    feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, tensor, range_list, rpc_option)
+else:
+    indices = indices.to(args.local_rank)
+    feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, tensor, range_list, rpc_option)
 
 for idx in range(5):
     data = feature_server[indices]
