@@ -44,15 +44,16 @@ class FeatureServer(object):
     def __init__(self):
         pass
 
-    def init(self, world_size, rank, shard_tensor, range_list: List[Range], rpc_option) -> None:
+    def init(self, world_size, rank, local_rank, shard_tensor, range_list: List[Range], rpc_option) -> None:
         self.shard_tensor = shard_tensor
         self.range_list = range_list
         self.rank = rank
+        self.local_rank = local_rank
         self.world_size = world_size
         rpc.init_rpc(f"worker{rank}", rank=self.rank, world_size= world_size, rpc_backend_options=rpc_option)
 
     def collect(self, nodes):
-        torch.cuda.set_device(self.rank)
+        torch.cuda.set_device(self.local_rank)
         nodes -= self.range_list[self.rank].start
         data = self.shard_tensor[nodes]
         return data
