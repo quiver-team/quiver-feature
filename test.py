@@ -78,7 +78,7 @@ if args.cpu_collect and args.cpu_collect_gpu_send:
     print("CPU Collect and GPU Send,  Update To: Transports: IBV, Channel: CUDA_BASIC")
     rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
 
-debug_param =  vars(args)
+debug_param =  {"cpu_collect_gpu_send": args.cpu_collect_gpu_send}
 
 NUM_ELEMENT = 1000000
 FEATURE_DIM = 600

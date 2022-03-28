@@ -44,12 +44,13 @@ class FeatureServer(object):
     def __init__(self):
         pass
 
-    def init(self, world_size, rank, local_rank, shard_tensor, range_list: List[Range], rpc_option, **debug_params) -> None:
+    def init(self, world_size, rank, local_size, local_rank, shard_tensor, range_list: List[Range], rpc_option, **debug_params) -> None:
         self.shard_tensor = shard_tensor
         self.range_list = range_list
         self.rank = rank
         self.local_rank = local_rank
         self.world_size = world_size
+        self.local_size = local_size
         self.debug_params = debug_params
         
         rpc.init_rpc(f"worker{rank}", rank=self.rank, world_size= world_size, rpc_backend_options=rpc_option)
@@ -73,7 +74,7 @@ class FeatureServer(object):
 
         
         start = time.time()
-        for worker_id in range(self.local_rank, len(self.range_list), self.debug_params["device_per_node"]):
+        for worker_id in range(self.local_rank, len(self.range_list), self.local_size):
             range = self.range_list[worker_id]
             if worker_id != self.rank:
                 request_nodes_mask = (nodes >= range.start) & (nodes < range.end)
