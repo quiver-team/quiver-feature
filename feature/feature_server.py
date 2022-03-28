@@ -73,7 +73,8 @@ class FeatureServer(object):
 
         
         start = time.time()
-        for worker_id, range in enumerate(self.range_list):
+        for worker_id in range(self.local_rank, len(self.range_list), self.debug_params["device_per_node"]):
+            range = self.range_list[worker_id]
             if worker_id != self.rank:
                 request_nodes_mask = (nodes >= range.start) & (nodes < range.end)
                 request_nodes = torch.masked_select(nodes, request_nodes_mask)
