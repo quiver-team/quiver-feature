@@ -35,9 +35,11 @@ parser.add_argument("-test_ib", type=int, default=1, help ="test IB")
 args = parser.parse_args()
 device_map = {}
 for idx in range(args.world_size):
+    device_map[f"worker{idx}"] = {}
     for device_idx in range(args.device_per_node):
-        device_map[f"worker{idx}"] = {device_idx: device_idx}
+        device_map[f"worker{idx}"][device_idx] = device_idx
 
+print(f"Device Map: {device_map}")
 print(f"Rank {args.rank}: Test Mode Is {'CPU' if args.cpu_collect else 'GPU'}")
 """
 All transports and channels we have:
@@ -92,7 +94,7 @@ host_tensor = np.random.randint(0,
                                 high=10,
                                 size=(NUM_ELEMENT, FEATURE_DIM))
 tensor = torch.from_numpy(host_tensor).type(torch.float32)
-shard_tensor_config = ShardTensorConfig({})
+shard_tensor_config = ShardTensorConfig({args.local_rank: "3G"})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
 range_list = [Range(NUM_ELEMENT * idx, NUM_ELEMENT * (idx + 1)) for idx in range(args.world_size)]
@@ -117,4 +119,5 @@ data = feature_server[indices]
 torch.cuda.synchronize()
 consumed_time = time.time() - start
 print(f"Bandwidth in Rank {args.rank} = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time }GB/s")
+time.sleep(10)
 rpc.shutdown()
