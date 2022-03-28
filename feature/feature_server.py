@@ -73,17 +73,16 @@ class FeatureServer(object):
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
         
-        start = time.time()
-        for worker_id in range(self.local_rank, len(self.range_list), self.local_size):
+        for worker_id in range(self.local_rank, self.world_size, self.local_size):
             range_item = self.range_list[worker_id]
             if worker_id != self.rank:
                 request_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
                 request_nodes = torch.masked_select(nodes, request_nodes_mask)
                 if request_nodes.shape[0] > 0:
+                    print(f"Dispatch Request From Rank {self.rank} To Rank {worker_id}")
                     part_orders = torch.masked_select(input_orders, request_nodes_mask)
                     fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
                     task_list.append(Task(part_orders, fut))
-        print("request dispatching time = ", time.time() - start)
         
         start = time.time()
 
@@ -96,12 +95,14 @@ class FeatureServer(object):
             # TODO: Just For Debugging
             feature = torch.empty(nodes.shape[0], self.shard_tensor.shape[1])
 
-        print("local collect = ", time.time() - start)
         
         start = time.time()
+        collected_count = 0
         for task in task_list:
             task.wait()
             feature[task.prev_order] = task.data
-        print("network waiting = ", time.time() - start)
+            collected_count += task.data.shape[0]
+        
+        print("network waiting = ", time.time() - start, "collected ", collected_count, " items")
         return feature
     

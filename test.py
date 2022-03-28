@@ -96,8 +96,14 @@ tensor = torch.from_numpy(host_tensor).type(torch.float32)
 shard_tensor_config = ShardTensorConfig({args.local_rank: "3G"})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
-range_list = [Range(NUM_ELEMENT * idx, NUM_ELEMENT * (idx + 1)) for idx in range(args.world_size)]
-host_indice = np.random.randint(0, high= args.world_size * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
+
+range_list = []
+for idx in range(args.world_size // args.device_per_node):
+    range_item = Range(NUM_ELEMENT * idx, NUM_ELEMENT * (idx + 1))
+    for _ in range(args.device_per_node):
+        range_list.append(range_item)
+
+host_indice = np.random.randint(0, high= (args.world_size // args.device_per_node) * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
 indices = torch.from_numpy(host_indice).type(torch.long)
 
 
