@@ -59,7 +59,6 @@ class FeatureServer(object):
         # TODO Just For Debugging
         if nodes.is_cuda:
             torch.cuda.set_device(self.local_rank)
-        
         nodes -= self.range_list[self.rank].start
         data = self.shard_tensor[nodes]
         if self.debug_params.get("cpu_collect_gpu_send", 0):
@@ -72,35 +71,41 @@ class FeatureServer(object):
         task_list: List[Task] = []
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
-        
+        local_part_orders = None
+        local_request_nodes = None
         for worker_id in range(self.local_rank, self.world_size, self.local_size):
             range_item = self.range_list[worker_id]
             if worker_id != self.rank:
                 request_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
                 request_nodes = torch.masked_select(nodes, request_nodes_mask)
                 if request_nodes.shape[0] > 0:
-                    print(f"Dispatch Request From Rank {self.rank} To Rank {worker_id}")
                     part_orders = torch.masked_select(input_orders, request_nodes_mask)
                     fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
                     task_list.append(Task(part_orders, fut))
+            else:
+                request_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
+                local_request_nodes = torch.masked_select(nodes, request_nodes_mask)
+                
+                local_part_orders = torch.masked_select(input_orders, request_nodes_mask)
+
         
         start = time.time()
 
-        if self.debug_params.get("cpu_collect_gpu_send", 0):
-            feature = torch.empty(nodes.shape[0], self.shard_tensor.shape[1], device = nodes.device)
-
-        elif nodes.is_cuda:
-            feature = self.shard_tensor[nodes]
+        if nodes.is_cuda or self.debug_params.get("cpu_collect_gpu_send", 0):
+            feature = torch.zeros(nodes.shape[0], self.shard_tensor.shape[1], device = nodes.device)
         else:
             # TODO: Just For Debugging
             feature = torch.empty(nodes.shape[0], self.shard_tensor.shape[1])
 
+        feature[local_part_orders] = self.collect(local_request_nodes)
+        
         
         start = time.time()
         collected_count = 0
         for task in task_list:
             task.wait()
             feature[task.prev_order] = task.data
+        
             collected_count += task.data.shape[0]
         
         print("network waiting = ", time.time() - start, "collected ", collected_count, " items")

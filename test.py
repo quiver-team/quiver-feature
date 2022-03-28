@@ -89,9 +89,8 @@ SAMPLE_SIZE = 80000
 ########################
 torch.cuda.set_device(args.local_rank)
 
-host_tensor = np.random.randint(0,
-                                high=10,
-                                size=(NUM_ELEMENT, FEATURE_DIM))
+host_tensor = np.arange(NUM_ELEMENT * FEATURE_DIM)
+host_tensor = host_tensor.reshape(NUM_ELEMENT, FEATURE_DIM)
 tensor = torch.from_numpy(host_tensor).type(torch.float32)
 shard_tensor_config = ShardTensorConfig({args.local_rank: "3G"})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
@@ -105,6 +104,8 @@ for idx in range(args.world_size // args.device_per_node):
 
 host_indice = np.random.randint(0, high= (args.world_size // args.device_per_node) * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
 indices = torch.from_numpy(host_indice).type(torch.long)
+
+whole_tensor = torch.cat([tensor] * (args.world_size // args.device_per_node))
 
 
 # TODO Just For Debugging
@@ -123,6 +124,10 @@ start = time.time()
 data = feature_server[indices]
 torch.cuda.synchronize()
 consumed_time = time.time() - start
+data_cpu = data.cpu()
+indices_cpu = indices.cpu()
+data_gt = whole_tensor[indices_cpu]
+assert torch.equal(data_gt, data_cpu)
 print(f"Bandwidth in Rank {args.rank} = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time }GB/s")
 time.sleep(10)
 rpc.shutdown()
