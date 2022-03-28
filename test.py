@@ -121,13 +121,13 @@ warm_up = 4
 for idx in range(warm_up):
     data = feature_server[indices]
 
-test_count = 10
+test_count = 30
 consumed_time = 0
 for idx in range(test_count):
     start = time.time()
     data = feature_server[indices]
     consumed_time += time.time() - start
-    
+
 data_cpu = data.cpu()
 indices_cpu = indices.cpu()
 data_gt = whole_tensor[indices_cpu]
