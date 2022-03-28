@@ -106,9 +106,9 @@ if args.cpu_collect_gpu_send or not args.cpu_collect:
     indices = indices.to(args.local_rank)
 
 if args.cpu_collect:
-    feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, tensor, range_list, rpc_option, **debug_param)
+    feature_server = FeatureServer(args.world_size, args.rank, args.device_per_node, args.local_rank, tensor, range_list, rpc_option, **debug_param)
 else:
-    feature_server = FeatureServer(args.world_size, args.rank, args.local_rank, shard_tensor, range_list, rpc_option, **debug_param)
+    feature_server = FeatureServer(args.world_size, args.rank, args.device_per_node, args.local_rank, shard_tensor, range_list, rpc_option, **debug_param)
 
 for idx in range(5):
     data = feature_server[indices]
