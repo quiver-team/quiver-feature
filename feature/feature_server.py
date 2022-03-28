@@ -75,9 +75,9 @@ class FeatureServer(object):
         
         start = time.time()
         for worker_id in range(self.local_rank, len(self.range_list), self.local_size):
-            range = self.range_list[worker_id]
+            range_item = self.range_list[worker_id]
             if worker_id != self.rank:
-                request_nodes_mask = (nodes >= range.start) & (nodes < range.end)
+                request_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
                 request_nodes = torch.masked_select(nodes, request_nodes_mask)
                 if request_nodes.shape[0] > 0:
                     part_orders = torch.masked_select(input_orders, request_nodes_mask)
