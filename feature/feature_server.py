@@ -82,11 +82,11 @@ class FeatureServer(object):
                     part_orders = torch.masked_select(input_orders, request_nodes_mask)
                     fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
                     task_list.append(Task(part_orders, fut))
-            else:
-                request_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
-                local_request_nodes = torch.masked_select(nodes, request_nodes_mask)
-                
-                local_part_orders = torch.masked_select(input_orders, request_nodes_mask)
+        
+        range_item = self.range_list[self.rank]
+        request_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
+        local_request_nodes = torch.masked_select(nodes, request_nodes_mask)
+        local_part_orders = torch.masked_select(input_orders, request_nodes_mask)
 
         
         start = time.time()
