@@ -117,17 +117,21 @@ if args.cpu_collect:
 else:
     feature_server = FeatureServer(args.world_size, args.rank, args.device_per_node, args.local_rank, shard_tensor, range_list, rpc_option, **debug_param)
 
-for idx in range(5):
+warm_up = 4
+for idx in range(warm_up):
     data = feature_server[indices]
-torch.cuda.synchronize()
-start = time.time()
-data = feature_server[indices]
-torch.cuda.synchronize()
-consumed_time = time.time() - start
+
+test_count = 10
+consumed_time = 0
+for idx in range(test_count):
+    start = time.time()
+    data = feature_server[indices]
+    consumed_time += time.time() - start
+    
 data_cpu = data.cpu()
 indices_cpu = indices.cpu()
 data_gt = whole_tensor[indices_cpu]
 assert torch.equal(data_gt, data_cpu)
-print(f"Bandwidth in Rank {args.rank} = {torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time }GB/s")
+print(f"Bandwidth in Rank {args.rank} = {test_count * torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time  }GB/s")
 time.sleep(10)
 rpc.shutdown()
