@@ -1,0 +1,1 @@
+python3 start_worker.py -device_per_node 1 -start_rank 0 -world_size 2

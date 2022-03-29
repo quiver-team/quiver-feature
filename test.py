@@ -121,7 +121,7 @@ warm_up = 4
 for idx in range(warm_up):
     data = feature_server[indices]
 
-test_count = 30
+test_count = 100
 consumed_time = 0
 for idx in range(test_count):
     start = time.time()
