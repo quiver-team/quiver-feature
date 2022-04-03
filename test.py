@@ -1,4 +1,4 @@
-from feature import FeatureServer, Range, Task
+from feature import DistFeature, Range
 import torch
 import numpy as np
 from quiver.shard_tensor import ShardTensorConfig, ShardTensor
@@ -92,7 +92,7 @@ torch.cuda.set_device(args.local_rank)
 host_tensor = np.arange(NUM_ELEMENT * FEATURE_DIM)
 host_tensor = host_tensor.reshape(NUM_ELEMENT, FEATURE_DIM)
 tensor = torch.from_numpy(host_tensor).type(torch.float32)
-shard_tensor_config = ShardTensorConfig({args.local_rank: "3G"})
+shard_tensor_config = ShardTensorConfig({})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
 
@@ -113,19 +113,19 @@ if args.cpu_collect_gpu_send or not args.cpu_collect:
     indices = indices.to(args.local_rank)
 
 if args.cpu_collect:
-    feature_server = FeatureServer(args.world_size, args.rank, args.device_per_node, args.local_rank, tensor, range_list, rpc_option, **debug_param)
+    dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, tensor, range_list, rpc_option, **debug_param)
 else:
-    feature_server = FeatureServer(args.world_size, args.rank, args.device_per_node, args.local_rank, shard_tensor, range_list, rpc_option, **debug_param)
+    dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, shard_tensor, range_list, rpc_option, **debug_param)
 
 warm_up = 4
 for idx in range(warm_up):
-    data = feature_server[indices]
+    data = dist_feature[indices]
 
 test_count = 100
 consumed_time = 0
 for idx in range(test_count):
     start = time.time()
-    data = feature_server[indices]
+    data = dist_feature[indices]
     consumed_time += time.time() - start
 
 data_cpu = data.cpu()

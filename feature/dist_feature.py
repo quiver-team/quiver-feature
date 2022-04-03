@@ -2,7 +2,6 @@ import torch.distributed.rpc as rpc
 import torch
 from collections import namedtuple
 from typing import List
-from quiver.shard_tensor import ShardTensor, ShardTensorConfig
 import time
 Range = namedtuple("Range", ["start", "end"])
 
@@ -34,12 +33,12 @@ class Singleton(object):
         return self._instance[self._cls]
 
 def collect(nodes):
-    feature_server = FeatureServer()
-    return feature_server.collect(nodes)
+    dist_feature = DistFeature()
+    return dist_feature.collect(nodes)
 
 
 @Singleton
-class FeatureServer(object):
+class DistFeature(object):
 
     def __init__(self):
         pass
@@ -100,14 +99,8 @@ class FeatureServer(object):
         feature[local_part_orders] = self.collect(local_request_nodes)
         
         
-        start = time.time()
-        collected_count = 0
         for task in task_list:
             task.wait()
-            feature[task.prev_order] = task.data
-        
-            collected_count += task.data.shape[0]
-        
-        print("network waiting = ", time.time() - start, "collected ", collected_count, " items")
+            feature[task.prev_order] = task.data        
         return feature
     

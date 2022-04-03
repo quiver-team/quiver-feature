@@ -1,3 +1,3 @@
-from .feature_server import FeatureServer, Range, Task
+from .dist_feature import DistFeature, Range, Task
 
-__all__ = ["FeatureServer", "Range", "Task"]
+__all__ = ["DistFeature", "Range", "Task"]
