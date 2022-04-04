@@ -88,7 +88,7 @@ SAMPLE_SIZE = 80000
 # Init With Numpy
 ########################
 torch.cuda.set_device(args.local_rank)
-cached_ratio = 0.1
+cached_ratio = 0.0
 cached_range = Range(0, int(cached_ratio * NUM_ELEMENT * args.world_size // args.device_per_node))
 UNCACHED_NUM_ELEMENT = (NUM_ELEMENT * args.world_size // args.device_per_node - cached_range.end) // (args.world_size // args.device_per_node)
 
@@ -142,12 +142,6 @@ for idx in range(test_count):
 data_cpu = data.cpu()
 indices_cpu = indices.cpu()
 data_gt = whole_tensor[indices_cpu]
-
-res = (data_gt != data_cpu)[:, 0]
-print(data_cpu[res])
-print(data_gt[res])
-print(indices_cpu[res])
-
 
 assert torch.equal(data_gt, data_cpu)
 print(f"Bandwidth in Rank {args.rank} = {test_count * torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time  }GB/s")
