@@ -43,7 +43,7 @@ class DistFeature(object):
     def __init__(self):
         pass
 
-    def init(self, world_size, rank, local_size, local_rank, shard_tensor, range_list: List[Range], rpc_option, cached_range = None, **debug_params) -> None:
+    def init(self, world_size, rank, local_size, local_rank, shard_tensor, range_list: List[Range], rpc_option, cached_range = Range(start=0, end=0), **debug_params) -> None:
         self.shard_tensor = shard_tensor
         self.range_list = range_list
         self.cached_range = cached_range
@@ -60,6 +60,7 @@ class DistFeature(object):
         if nodes.is_cuda:
             torch.cuda.set_device(self.local_rank)
         nodes -= self.range_list[self.rank].start
+        nodes += self.cached_range.end
         data = self.shard_tensor[nodes]
         if self.debug_params.get("cpu_collect_gpu_send", 0):
             data = data.to(self.local_rank)
@@ -101,7 +102,7 @@ class DistFeature(object):
 
 
         # Load Cached Data
-        if self.cached_range:
+        if self.cached_range.end > 0:
             request_nodes_mask = (nodes >= self.cached_range.start) & (nodes < self.cached_range.end)
             cache_request_nodes = torch.masked_select(nodes, request_nodes_mask)
             cache_part_orders = torch.masked_select(input_orders, request_nodes_mask)
