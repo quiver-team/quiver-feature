@@ -88,28 +88,36 @@ SAMPLE_SIZE = 80000
 # Init With Numpy
 ########################
 torch.cuda.set_device(args.local_rank)
+cached_ratio = 0.1
+cached_range = Range(0, int(cached_ratio * NUM_ELEMENT * args.world_size // args.device_per_node))
+UNCACHED_NUM_ELEMENT = (NUM_ELEMENT * args.world_size // args.device_per_node - cached_range.end) // (args.world_size // args.device_per_node)
 
-host_tensor = np.arange(NUM_ELEMENT * FEATURE_DIM)
-host_tensor = host_tensor.reshape(NUM_ELEMENT, FEATURE_DIM)
+host_tensor = np.arange((UNCACHED_NUM_ELEMENT + cached_range.end ) * FEATURE_DIM)
+host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEATURE_DIM)
+
 tensor = torch.from_numpy(host_tensor).type(torch.float32)
+
 shard_tensor_config = ShardTensorConfig({})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
 
-cached_ratio = 0.1
-cached_range = Range(0, int(cached_ratio * NUM_ELEMENT * args.world_size // args.device_per_node))
-UNCACHED_NUM_ELEMENT = (NUM_ELEMENT * args.world_size // args.device_per_node - cached_range.end) // (args.world_size // args.device_per_node)
+
 range_list = []
 for idx in range(args.world_size // args.device_per_node):
-    range_item = Range(UNCACHED_NUM_ELEMENT * idx, UNCACHED_NUM_ELEMENT * (idx + 1))
+    range_item = Range(cached_range.end + UNCACHED_NUM_ELEMENT * idx, cached_range.end + UNCACHED_NUM_ELEMENT * (idx + 1))
     for _ in range(args.device_per_node):
         range_list.append(range_item)
+
+print(f"Cached Range : {cached_range}")
+print(f"Check Node Store Range: {range_list}")
 
 host_indice = np.random.randint(0, high= (args.world_size // args.device_per_node) * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
 indices = torch.from_numpy(host_indice).type(torch.long)
 
-whole_tensor = torch.cat([tensor] * (args.world_size // args.device_per_node))
+whole_tensor = torch.cat([tensor[:cached_range.end, ]] + [tensor[cached_range.end:, ]] * (args.world_size // args.device_per_node))
 
+print(f"Whole Tensor Shape: {whole_tensor.shape}")
+print(f"Shard Tensor Shape: {shard_tensor.shape}")
 
 # TODO Just For Debugging
 if args.cpu_collect_gpu_send or not args.cpu_collect:
@@ -134,7 +142,14 @@ for idx in range(test_count):
 data_cpu = data.cpu()
 indices_cpu = indices.cpu()
 data_gt = whole_tensor[indices_cpu]
-#assert torch.equal(data_gt, data_cpu)
+
+res = (data_gt != data_cpu)[:, 0]
+print(data_cpu[res])
+print(data_gt[res])
+print(indices_cpu[res])
+
+
+assert torch.equal(data_gt, data_cpu)
 print(f"Bandwidth in Rank {args.rank} = {test_count * torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time  }GB/s")
 time.sleep(10)
 rpc.shutdown()

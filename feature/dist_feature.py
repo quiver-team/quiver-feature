@@ -56,6 +56,7 @@ class DistFeature(object):
         rpc.init_rpc(f"worker{rank}", rank=self.rank, world_size= world_size, rpc_backend_options=rpc_option)
 
     def collect(self, nodes):
+        
         # TODO Just For Debugging
         if nodes.is_cuda:
             torch.cuda.set_device(self.local_rank)
@@ -70,7 +71,6 @@ class DistFeature(object):
          # TODO Just For Debugging
         if nodes.is_cuda:
             torch.cuda.set_device(self.local_rank)
-        nodes -= self.cache_range.start
         data = self.shard_tensor[nodes]
         if self.debug_params.get("cpu_collect_gpu_send", 0):
             data = data.to(self.local_rank)
