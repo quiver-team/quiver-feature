@@ -82,23 +82,22 @@ class DistFeature(object):
     def __getitem__(self, nodes):
 
         task_list: List[Task] = []
-        start = time.time()
         if self.order_transform is not None:
             nodes = self.order_transform[nodes]
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
+        remote_collect = 0
         for worker_id in range(self.local_rank, self.world_size, self.local_size):
             range_item = self.range_list[worker_id]
             if worker_id != self.rank:
                 request_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
                 request_nodes = torch.masked_select(nodes, request_nodes_mask)
                 if request_nodes.shape[0] > 0:
-                    print(f"{self.rank} -> {worker_id}:\tCollect {request_nodes.shape[0]} / {nodes.shape[0]}")
+                    remote_collect += request_nodes.shape[0]
                     part_orders = torch.masked_select(input_orders, request_nodes_mask)
                     fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
                     task_list.append(Task(part_orders, fut))
         
-        print(f"Request Dispatching Time: {time.time() - start}")
         if nodes.is_cuda or self.debug_params.get("cpu_collect_gpu_send", 0):
             feature = torch.zeros(nodes.shape[0], self.shard_tensor.shape[1], device = nodes.device)
         else:
@@ -123,13 +122,11 @@ class DistFeature(object):
         local_part_orders = torch.masked_select(input_orders, request_nodes_mask)
         if local_request_nodes.shape[0] > 0:
             feature[local_part_orders] = self.collect(local_request_nodes)
-        
-        print(f"Local Collect Time = {time.time() - start}")
 
         start = time.time()
         for task in task_list:
             task.wait()
             feature[task.prev_order] = task.data    
-        print(f"Network Collect Time = {time.time() - start}")    
+        print(f"{self.rank}:\tNetwork Collect Time = {time.time() - start}\tLocal Hit Rate = {1 - remote_collect/nodes.shape[0]}")
         return feature
     
