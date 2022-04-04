@@ -6,6 +6,7 @@ import argparse
 import os
 import time
 import torch.distributed.rpc as rpc
+import quiver
 
 
 """
@@ -20,6 +21,8 @@ os.environ["NCCL_SOCKET_IFNAME"] = "eth0"
 os.environ["TP_SOCKET_IFNAME"] = "eth0"
 os.environ["GLOO_SOCKET_IFNAME"] = "eth0"
 os.environ["TP_VERBOSE_LOGGING"] = "0"
+
+
 
 
 
@@ -80,28 +83,32 @@ if args.cpu_collect and args.cpu_collect_gpu_send:
 
 debug_param =  {"cpu_collect_gpu_send": args.cpu_collect_gpu_send}
 
-NUM_ELEMENT = 1000000
-FEATURE_DIM = 600
-SAMPLE_SIZE = 80000
+
+def load_topo_paper100M():
+    indptr = torch.load("/data/papers/ogbn_papers100M/csr/indptr.pt")
+    indices = torch.load("/data/papers/ogbn_papers100M/csr/indices.pt")
+    train_idx = torch.load("/data/papers/ogbn_papers100M/index/train_idx.pt")
+    csr_topo = quiver.CSRTopo(indptr=indptr, indices=indices)
+    quiver_sampler = quiver.pyg.GraphSageSampler(csr_topo, [1], 0, mode="UVA")
+    print(f"Graph Stats:\tNodes:{csr_topo.node_count}\tEdges:{csr_topo.edge_count}\tAvg_Deg:{csr_topo.edge_count / csr_topo.node_count}")
+    return train_idx, csr_topo, quiver_sampler
+
+def load_feat_paper100M():
+    feat =  torch.load("/data/papers/ogbn_papers100M/feat/sort_feature.pt")
+    order_transform = torch.load("/data/papers/ogbn_papers100M/feat/prev_order.pt")
+    print(f"Feature Stats:\tDim:{feat.shape[1]}")
+    return feat, order_transform
+
+
 
 #########################
-# Init With Numpy
+# Load Data
 ########################
 torch.cuda.set_device(args.local_rank)
-cached_ratio = 0.0
-cached_range = Range(0, int(cached_ratio * NUM_ELEMENT * args.world_size // args.device_per_node))
-UNCACHED_NUM_ELEMENT = (NUM_ELEMENT * args.world_size // args.device_per_node - cached_range.end) // (args.world_size // args.device_per_node)
-
-host_tensor = np.arange((UNCACHED_NUM_ELEMENT + cached_range.end ) * FEATURE_DIM)
-host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEATURE_DIM)
-
-tensor = torch.from_numpy(host_tensor).type(torch.float32)
-
-shard_tensor_config = ShardTensorConfig({})
-shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
-shard_tensor.from_cpu_tensor(tensor)
-
-
+train_idx, csr_topo, quiver_sampler = load_topo_paper100M()
+cached_ratio = 0.2
+cached_range = Range(0, int(cached_ratio * csr_topo.node_count))
+UNCACHED_NUM_ELEMENT = (csr_topo.node_count - cached_range.end) // (args.world_size // args.device_per_node)
 range_list = []
 for idx in range(args.world_size // args.device_per_node):
     range_item = Range(cached_range.end + UNCACHED_NUM_ELEMENT * idx, cached_range.end + UNCACHED_NUM_ELEMENT * (idx + 1))
@@ -111,39 +118,46 @@ for idx in range(args.world_size // args.device_per_node):
 print(f"Cached Range : {cached_range}")
 print(f"Check Node Store Range: {range_list}")
 
-host_indice = np.random.randint(0, high= (args.world_size // args.device_per_node) * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
-indices = torch.from_numpy(host_indice).type(torch.long)
+feat, order_transform = load_feat_paper100M()
+local_feature = torch.cat((feat[:cached_range.end, :], feat[range_list[args.rank].start: range_list[args.rank].end, :]))
 
-whole_tensor = torch.cat([tensor[:cached_range.end, ]] + [tensor[cached_range.end:, ]] * (args.world_size // args.device_per_node))
+device_config = {}
+for local_rank in range(args.device_per_node):
+    device_config[local_rank] = "8G"
+shard_tensor_config = ShardTensorConfig(device_config)
+shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 
-print(f"Whole Tensor Shape: {whole_tensor.shape}")
+shard_tensor.from_cpu_tensor(local_feature)
+
+
+print(f"Whole Tensor Shape: {feat.shape}")
 print(f"Shard Tensor Shape: {shard_tensor.shape}")
 
-# TODO Just For Debugging
-if args.cpu_collect_gpu_send or not args.cpu_collect:
-    indices = indices.to(args.local_rank)
+
 
 if args.cpu_collect:
-    dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, tensor, range_list, rpc_option, cached_range, **debug_param)
+    dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, feat, range_list, rpc_option, cached_range, order_transform, **debug_param)
 else:
-    dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, shard_tensor, range_list, rpc_option, cached_range, **debug_param)
+    dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, shard_tensor, range_list, rpc_option, cached_range, order_transform, **debug_param)
 
-warm_up = 4
-for idx in range(warm_up):
-    data = dist_feature[indices]
 
-test_count = 100
+dataloader = torch.utils.data.DataLoader(train_idx, batch_size=256)
+for seeds in dataloader:
+    n_id, _, _ = quiver_sampler.sample(seeds)
+    n_id = n_id.to(args.local_rank)
+    collected_feature = dist_feature[n_id]
+    break
+
 consumed_time = 0
-for idx in range(test_count):
+collected_size = 0
+for seeds in dataloader:
+    n_id, _, _ = quiver_sampler.sample(seeds)
+    n_id = n_id.to(args.local_rank)
     start = time.time()
-    data = dist_feature[indices]
+    collected_feature = dist_feature[n_id]
     consumed_time += time.time() - start
+    collected_size += torch.numel(collected_feature) * 4
 
-data_cpu = data.cpu()
-indices_cpu = indices.cpu()
-data_gt = whole_tensor[indices_cpu]
-
-assert torch.equal(data_gt, data_cpu)
-print(f"Bandwidth in Rank {args.rank} = {test_count * torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time  }GB/s")
+print(f"Bandwidth in Rank {args.rank} = {collected_size / 1024 / 1024 / 1024 / consumed_time  }GB/s")
 time.sleep(10)
 rpc.shutdown()

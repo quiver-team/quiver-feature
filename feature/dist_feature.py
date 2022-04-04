@@ -43,10 +43,11 @@ class DistFeature(object):
     def __init__(self):
         pass
 
-    def init(self, world_size, rank, local_size, local_rank, shard_tensor, range_list: List[Range], rpc_option, cached_range = Range(start=0, end=0), **debug_params) -> None:
+    def init(self, world_size, rank, local_size, local_rank, shard_tensor, range_list: List[Range], rpc_option, cached_range = Range(start=0, end=0), order_transform=None, **debug_params) -> None:
         self.shard_tensor = shard_tensor
         self.range_list = range_list
         self.cached_range = cached_range
+        self.order_transform = order_transform
         self.rank = rank
         self.local_rank = local_rank
         self.world_size = world_size
@@ -81,6 +82,8 @@ class DistFeature(object):
     def __getitem__(self, nodes):
 
         task_list: List[Task] = []
+        if self.order_transform:
+            nodes = self.order_transform[nodes]
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
         for worker_id in range(self.local_rank, self.world_size, self.local_size):
