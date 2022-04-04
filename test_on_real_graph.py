@@ -94,8 +94,8 @@ def load_topo_paper100M():
     return train_idx, csr_topo, quiver_sampler
 
 def load_feat_paper100M():
-    feat =  torch.load("/data/papers/ogbn_papers100M/feat/sort_feature.pt")
-    order_transform = torch.load("/data/papers/ogbn_papers100M/feat/prev_order.pt")
+    feat =  torch.load("/data/dalong/sorted_feature_020.pt")
+    order_transform = torch.load("/data/dalong/sorted_order_020.pt")
     print(f"Feature Stats:\tDim:{feat.shape[1]}")
     return feat, order_transform
 
