@@ -89,7 +89,7 @@ def load_topo_paper100M():
     indices = torch.load("/data/papers/ogbn_papers100M/csr/indices.pt")
     train_idx = torch.load("/data/papers/ogbn_papers100M/index/train_idx.pt")
     csr_topo = quiver.CSRTopo(indptr=indptr, indices=indices)
-    quiver_sampler = quiver.pyg.GraphSageSampler(csr_topo, [1], 0, mode="UVA")
+    quiver_sampler = quiver.pyg.GraphSageSampler(csr_topo, [15, 10, 5], 0, mode="UVA")
     print(f"Graph Stats:\tNodes:{csr_topo.node_count}\tEdges:{csr_topo.edge_count}\tAvg_Deg:{csr_topo.edge_count / csr_topo.node_count}")
     return train_idx, csr_topo, quiver_sampler
 
