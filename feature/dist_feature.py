@@ -47,7 +47,7 @@ class DistFeature(object):
         self.shard_tensor = shard_tensor
         self.range_list = range_list
         self.cached_range = cached_range
-        self.order_transform = order_transform
+        self.order_transform = order_transform.to(self.local_rank)
         self.rank = rank
         self.local_rank = local_rank
         self.world_size = world_size
@@ -82,7 +82,7 @@ class DistFeature(object):
     def __getitem__(self, nodes):
 
         task_list: List[Task] = []
-        if self.order_transform:
+        if self.order_transform is not None:
             nodes = self.order_transform[nodes]
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
