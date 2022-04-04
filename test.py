@@ -96,9 +96,12 @@ shard_tensor_config = ShardTensorConfig({})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
 
+cached_ratio = 0.1
+cached_range = Range(0, int(cached_ratio * NUM_ELEMENT * args.world_size // args.device_per_node))
+UNCACHED_NUM_ELEMENT = (NUM_ELEMENT * args.world_size // args.device_per_node - cached_range.end) // (args.world_size // args.device_per_node)
 range_list = []
 for idx in range(args.world_size // args.device_per_node):
-    range_item = Range(NUM_ELEMENT * idx, NUM_ELEMENT * (idx + 1))
+    range_item = Range(UNCACHED_NUM_ELEMENT * idx, UNCACHED_NUM_ELEMENT * (idx + 1))
     for _ in range(args.device_per_node):
         range_list.append(range_item)
 

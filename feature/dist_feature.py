@@ -43,9 +43,10 @@ class DistFeature(object):
     def __init__(self):
         pass
 
-    def init(self, world_size, rank, local_size, local_rank, shard_tensor, range_list: List[Range], rpc_option, **debug_params) -> None:
+    def init(self, world_size, rank, local_size, local_rank, shard_tensor, range_list: List[Range], rpc_option, cached_range = None, **debug_params) -> None:
         self.shard_tensor = shard_tensor
         self.range_list = range_list
+        self.cached_range = cached_range
         self.rank = rank
         self.local_rank = local_rank
         self.world_size = world_size
@@ -63,6 +64,17 @@ class DistFeature(object):
         if self.debug_params.get("cpu_collect_gpu_send", 0):
             data = data.to(self.local_rank)
         return data
+    
+    def collect_cached_data(self, nodes):
+         # TODO Just For Debugging
+        if nodes.is_cuda:
+            torch.cuda.set_device(self.local_rank)
+        nodes -= self.cache_range.start
+        data = self.shard_tensor[nodes]
+        if self.debug_params.get("cpu_collect_gpu_send", 0):
+            data = data.to(self.local_rank)
+        return data
+
 
 
     def __getitem__(self, nodes):
@@ -70,8 +82,6 @@ class DistFeature(object):
         task_list: List[Task] = []
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
-        local_part_orders = None
-        local_request_nodes = None
         for worker_id in range(self.local_rank, self.world_size, self.local_size):
             range_item = self.range_list[worker_id]
             if worker_id != self.rank:
@@ -82,13 +92,6 @@ class DistFeature(object):
                     fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
                     task_list.append(Task(part_orders, fut))
         
-        range_item = self.range_list[self.rank]
-        request_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
-        local_request_nodes = torch.masked_select(nodes, request_nodes_mask)
-        local_part_orders = torch.masked_select(input_orders, request_nodes_mask)
-
-        
-        start = time.time()
 
         if nodes.is_cuda or self.debug_params.get("cpu_collect_gpu_send", 0):
             feature = torch.zeros(nodes.shape[0], self.shard_tensor.shape[1], device = nodes.device)
@@ -96,9 +99,24 @@ class DistFeature(object):
             # TODO: Just For Debugging
             feature = torch.empty(nodes.shape[0], self.shard_tensor.shape[1])
 
-        feature[local_part_orders] = self.collect(local_request_nodes)
-        
-        
+
+        # Load Cached Data
+        if self.cached_range:
+            request_nodes_mask = (nodes >= self.cached_range.start) & (nodes < self.cached_range.end)
+            cache_request_nodes = torch.masked_select(nodes, request_nodes_mask)
+            cache_part_orders = torch.masked_select(input_orders, request_nodes_mask)
+            if cache_request_nodes.shape[0] > 0:
+                feature[cache_part_orders] = self.collect_cached_data(cache_request_nodes)
+
+
+        # Load local data
+        range_item = self.range_list[self.rank]
+        request_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
+        local_request_nodes = torch.masked_select(nodes, request_nodes_mask)
+        local_part_orders = torch.masked_select(input_orders, request_nodes_mask)
+        if local_request_nodes.shape[0] > 0:
+            feature[local_part_orders] = self.collect(local_request_nodes)
+
         for task in task_list:
             task.wait()
             feature[task.prev_order] = task.data        
