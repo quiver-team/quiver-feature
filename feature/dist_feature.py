@@ -47,7 +47,7 @@ class DistFeature(object):
         self.shard_tensor = shard_tensor
         self.range_list = range_list
         self.cached_range = cached_range
-        self.order_transform = order_transform.to(self.local_rank)
+        self.order_transform = order_transform.to(local_rank)
         self.rank = rank
         self.local_rank = local_rank
         self.world_size = world_size
