@@ -1,7 +1,7 @@
 import torch
 import quiver
 
-def reindex(adj_csr, graph_feature, hot_ratio):
+def reindex(adj_csr, graph_feature=None, hot_ratio=0):
 
     node_count = adj_csr.indptr.shape[0] - 1
     total_range = torch.arange(node_count, dtype=torch.long)
@@ -15,8 +15,11 @@ def reindex(adj_csr, graph_feature, hot_ratio):
     new_order = torch.zeros_like(prev_order)
     prev_order[hot_part:] = prev_order[perm_range]
     new_order[prev_order] = total_range
-    graph_feature = graph_feature[prev_order]
+    if graph_feature is not None:
+        graph_feature = graph_feature[prev_order]
+
     return graph_feature, new_order
+
 
 
 def load_topo_paper100M():
@@ -55,6 +58,23 @@ def test_preprocess():
         hot_hit_rate = feature_n_id[feature_n_id < 0.6 * csr_topo.node_count].shape[0] / feature_n_id.shape[0]
         print(f"Check Hot Hit Rate {hot_hit_rate}")
 
-#preprocess()
-test_preprocess()
+def test_curve():
+    train_idx, csr_topo, quiver_sampler = load_topo_paper100M()
+    _, order_transform = reindex(csr_topo, hot_ratio=1)
+    order_transform = order_transform.cuda()
+    dataloader = torch.utils.data.DataLoader(train_idx, batch_size=256)
+    for ratio in range(1, 11):
+        hot_ratio = ratio / 10
+        hit_count = 0
+        total_count = 0
+        for seeds in dataloader:
+            n_id, _, _ = quiver_sampler.sample(seeds)
+            n_id = n_id.cuda()
+            feature_n_id = order_transform[n_id]
+            hit_count += feature_n_id[feature_n_id < hot_ratio * csr_topo.node_count].shape[0]
+            total_count += feature_n_id.shape[0]
+        print(f"Check Hot Hit Rate {hit_count / total_count}")
 
+#preprocess()
+#test_preprocess()
+test_curve()

@@ -1,7 +1,7 @@
 from feature import DistFeature, Range
 import torch
 import numpy as np
-from quiver.shard_tensor import ShardTensorConfig, ShardTensor
+import torch.multiprocessing as mp
 import argparse
 import os
 import time
@@ -14,7 +14,7 @@ import quiver
 2. Komodo1,2,3
 3. can we do some GPU sampling when waiting for network
 """
-os.environ['MASTER_ADDR'] = '155.198.152.17'
+os.environ['MASTER_ADDR'] = '155.198.152.18'
 os.environ['MASTER_PORT'] = '5678'
 
 os.environ["NCCL_SOCKET_IFNAME"] = "eth0"
@@ -26,11 +26,10 @@ os.environ["TP_VERBOSE_LOGGING"] = "0"
 
 
 
-parser = argparse.ArgumentParser(description='python3 test.py -rank x -world_size x  -cpu_collect True for test CPU')
-parser.add_argument('-rank', type=int, help='rank')
-parser.add_argument('-local_rank', type=int, default=0, help="local rank")
-parser.add_argument('-world_size', type=int, help="world size")
+parser = argparse.ArgumentParser(description='python3 test.py -start_rank x -world_size x  -cpu_collect True for test CPU')
 parser.add_argument("-device_per_node", type=int, default=1, help ="device per node")
+parser.add_argument("-start_rank", type=int, default=0, help ="test IB")
+parser.add_argument('-world_size', type=int, help="world size")
 parser.add_argument("-cpu_collect", type=int, default=0, help ="test for cpu collection")
 parser.add_argument("-cpu_collect_gpu_send", type=int, default=0, help ="send from gpu")
 parser.add_argument("-test_ib", type=int, default=1, help ="test IB")
@@ -43,7 +42,7 @@ for idx in range(args.world_size):
         device_map[f"worker{idx}"][device_idx] = device_idx
 
 print(f"Device Map: {device_map}")
-print(f"Rank {args.rank}: Test Mode Is {'CPU' if args.cpu_collect else 'GPU'}")
+print(f"Test Mode Is {'CPU' if args.cpu_collect else 'GPU'}")
 """
 All transports and channels we have:
 
@@ -94,17 +93,47 @@ def load_topo_paper100M():
     return train_idx, csr_topo, quiver_sampler
 
 def load_feat_paper100M():
-    feat =  torch.load("/data/papers/ogbn_papers100M/feat/sort_feature.pt")
-    order_transform = torch.load("/data/papers/ogbn_papers100M/feat/prev_order.pt")
+    feat =  torch.load("/data/dalong/sorted_feature_020.pt")
+    order_transform = torch.load("/data/dalong/sorted_order_020.pt")
     print(f"Feature Stats:\tDim:{feat.shape[1]}")
     return feat, order_transform
 
 
+def local_worker(local_rank, train_idx, quiver_sampler, args, quiver_feature, range_list, device_map, cached_range, order_transform, debug_param):
+
+    torch.cuda.set_device(local_rank)
+    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
+    order_transform = order_transform.to(local_rank)
+    if args.cpu_collect_gpu_send:
+        dist_feature = DistFeature(args.world_size, args.start_rank + local_rank, args.device_per_node, local_rank, quiver_feature, range_list, rpc_option, cached_range, order_transform, **debug_param)
+    else:
+        dist_feature = DistFeature(args.world_size, args.start_rank + local_rank, args.device_per_node, args.local_rank, quiver_feature, range_list, rpc_option, cached_range, order_transform, **debug_param)
+
+    
+    dataloader = torch.utils.data.DataLoader(train_idx, batch_size=256)
+    for seeds in dataloader:
+        n_id, _, _ = quiver_sampler.sample(seeds)
+        n_id = n_id.to(args.local_rank)
+        collected_feature = dist_feature[n_id]
+        break
+
+    consumed_time = 0
+    collected_size = 0
+    for seeds in dataloader:
+        n_id, _, _ = quiver_sampler.sample(seeds)
+        n_id = n_id.to(args.local_rank)
+        start = time.time()
+        collected_feature = dist_feature[n_id]
+        consumed_time += time.time() - start
+        collected_size += torch.numel(collected_feature) * 4
+
+    print(f"Bandwidth in Rank {args.start_rank + local_rank} = {collected_size / 1024 / 1024 / 1024 / consumed_time  }GB/s")
+    time.sleep(10)
+    rpc.shutdown()
 
 #########################
 # Load Data
 ########################
-torch.cuda.set_device(args.local_rank)
 train_idx, csr_topo, quiver_sampler = load_topo_paper100M()
 cached_ratio = 0.2
 cached_range = Range(0, int(cached_ratio * csr_topo.node_count))
@@ -119,45 +148,18 @@ print(f"Cached Range : {cached_range}")
 print(f"Check Node Store Range: {range_list}")
 
 feat, order_transform = load_feat_paper100M()
-local_feature = torch.cat((feat[:cached_range.end, :], feat[range_list[args.rank].start: range_list[args.rank].end, :]))
+local_feature = torch.cat((feat[:cached_range.end, :], feat[range_list[args.start_rank].start: range_list[args.start_rank].end, :]))
 
 device_config = {}
 for local_rank in range(args.device_per_node):
     device_config[local_rank] = "8G"
-shard_tensor_config = ShardTensorConfig(device_config)
-shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 
-shard_tensor.from_cpu_tensor(local_feature)
+quiver_feature = quiver.Feature(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="p2p_clique_replicate")
+quiver_feature.from_cpu_tensor(local_feature)
 
 
 print(f"Whole Tensor Shape: {feat.shape}")
-print(f"Shard Tensor Shape: {shard_tensor.shape}")
+print(f"Quiver Feature Shape: {quiver_feature.shape}")
 
+mp.spawn(local_worker, args=(train_idx, quiver_sampler, args, quiver_feature, range_list, device_map, cached_range, order_transform, debug_param), nprocs=args.device_per_node, join=True)
 
-
-if args.cpu_collect:
-    dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, feat, range_list, rpc_option, cached_range, order_transform, **debug_param)
-else:
-    dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, shard_tensor, range_list, rpc_option, cached_range, order_transform, **debug_param)
-
-
-dataloader = torch.utils.data.DataLoader(train_idx, batch_size=256)
-for seeds in dataloader:
-    n_id, _, _ = quiver_sampler.sample(seeds)
-    n_id = n_id.to(args.local_rank)
-    collected_feature = dist_feature[n_id]
-    break
-
-consumed_time = 0
-collected_size = 0
-for seeds in dataloader:
-    n_id, _, _ = quiver_sampler.sample(seeds)
-    n_id = n_id.to(args.local_rank)
-    start = time.time()
-    collected_feature = dist_feature[n_id]
-    consumed_time += time.time() - start
-    collected_size += torch.numel(collected_feature) * 4
-
-print(f"Bandwidth in Rank {args.rank} = {collected_size / 1024 / 1024 / 1024 / consumed_time  }GB/s")
-time.sleep(10)
-rpc.shutdown()
