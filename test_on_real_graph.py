@@ -124,6 +124,8 @@ def local_worker(local_rank, train_idx, quiver_sampler, args, quiver_feature, ra
         collected_feature = dist_feature[n_id]
         break
 
+    time_list = []
+    collected_lst = []
     consumed_time = 0
     collected_size = 0
     for seeds in dataloader:
@@ -131,9 +133,15 @@ def local_worker(local_rank, train_idx, quiver_sampler, args, quiver_feature, ra
         n_id = n_id.to(local_rank)
         start = time.time()
         collected_feature = dist_feature[n_id]
-        consumed_time += time.time() - start
-        collected_size += torch.numel(collected_feature) * 4
+        time_list.append(time.time() - start)
+        collected_lst.append(torch.numel(collected_feature) * 4)
+    
+    time_tensor = torch.Tensor(time_list)
+    collected_tensor = torch.Tensor(collected_lst)
+    sorted_time_tensor, sorted_order = torch.sort(time_tensor)
 
+    consumed_time = torch.sum(sorted_time_tensor[int(0.1 * sorted_time_tensor.shape[0]) : -int(0.1 * sorted_time_tensor.shape[0])])
+    collected_size = torch.sum(collected_tensor[sorted_order[int(0.1 * sorted_time_tensor.shape[0]) : -int(0.1 * sorted_time_tensor.shape[0])]])
     print(f"Bandwidth in Rank {args.start_rank + local_rank} = {collected_size / 1024 / 1024 / 1024 / consumed_time  }GB/s")
     time.sleep(10)
     rpc.shutdown()
