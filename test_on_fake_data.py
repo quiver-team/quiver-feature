@@ -99,7 +99,7 @@ host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEA
 
 tensor = torch.from_numpy(host_tensor).type(torch.float32)
 
-shard_tensor_config = ShardTensorConfig({})
+shard_tensor_config = ShardTensorConfig({args.local_rank:"4G"})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
 
@@ -125,7 +125,8 @@ print(f"Shard Tensor Shape: {shard_tensor.shape}")
 if args.cpu_collect_gpu_send or not args.cpu_collect:
     indices = indices.to(args.local_rank)
 
-if args.cpu_collect:
+if args.cpu_collect or args.cpu_collect_gpu_send:
+    print(f"Using CPU Collect")
     dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, tensor, range_list, rpc_option, cached_range, **debug_param)
 else:
     dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, shard_tensor, range_list, rpc_option, cached_range, **debug_param)
@@ -139,6 +140,8 @@ consumed_time = 0
 for idx in range(test_count):
     start = time.time()
     data = dist_feature[indices]
+    data = data.cuda()
+    torch.cuda.synchronize()
     consumed_time += time.time() - start
 
 data_cpu = data.cpu()

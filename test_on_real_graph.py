@@ -14,7 +14,7 @@ import quiver
 2. Komodo1,2,3
 3. can we do some GPU sampling when waiting for network
 """
-os.environ['MASTER_ADDR'] = '155.198.152.18'
+os.environ['MASTER_ADDR'] = '155.198.152.17'
 os.environ['MASTER_PORT'] = '5678'
 
 os.environ["NCCL_SOCKET_IFNAME"] = "eth0"
@@ -33,7 +33,7 @@ parser.add_argument('-world_size', type=int, help="world size")
 parser.add_argument("-cpu_collect", type=int, default=0, help ="test for cpu collection")
 parser.add_argument("-cpu_collect_gpu_send", type=int, default=0, help ="send from gpu")
 parser.add_argument("-test_ib", type=int, default=1, help ="test IB")
-parser.add_argument("-test_original", type=int, default=1, help="test original data")
+parser.add_argument("-test_original", type=int, default=0, help="test original data")
 
 args = parser.parse_args()
 device_map = {}
@@ -164,7 +164,7 @@ device_config = {}
 for local_rank in range(args.device_per_node):
     device_config[local_rank] = "8G"
 
-quiver_feature = quiver.Feature(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="p2p_clique_replicate")
+quiver_feature = quiver.Feature(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="device_replicate")
 quiver_feature.from_cpu_tensor(local_feature)
 
 
