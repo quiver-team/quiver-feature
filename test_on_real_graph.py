@@ -58,28 +58,7 @@ V0327 07:52:54.276447 2716381 tensorpipe/core/context_impl.cc:104] Context worke
 V0327 07:52:54.278730 2716381 tensorpipe/core/context_impl.cc:104] Context worker0 is registering channel mpt_uv
 """
 
-if args.cpu_collect and args.test_ib:
-    # python3 test.py -cpu_collect 1 -test_ib 1 
-    print("Transports: IBV, Channel: BASIC")
-    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['basic'])
-elif args.cpu_collect:
-    # python3 test.py -cpu_collect 1 -test_ib 0
-    print("Transports: UV, Channel: MPT_UV")
-    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['mpt_uv'])
-elif args.test_ib:
-     # python3 test.py -cpu_collect 0 -test_ib 1
-    print("Transports: IBV, Channel: CUDA_BASIC")
-    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
-else:
-      # python3 test.py -cpu_collect 0 -test_ib 0
-    print("Transports: UV, Channel: CUDA_BASIC")
-    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['cuda_basic'])
 
-if args.cpu_collect and args.cpu_collect_gpu_send:
-
-    # python3 test.py -cpu_collect 1 -test_ib 1 -cpu_collect_gpu_send 1
-    print("CPU Collect and GPU Send,  Update To: Transports: IBV, Channel: CUDA_BASIC")
-    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
 
 debug_param =  {"cpu_collect_gpu_send": args.cpu_collect_gpu_send}
 
@@ -108,7 +87,29 @@ def load_original_paper100M():
 def local_worker(local_rank, train_idx, quiver_sampler, args, quiver_feature, range_list, device_map, cached_range, order_transform, debug_param):
 
     torch.cuda.set_device(local_rank)
-    rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
+    rpc_option = None
+    if args.cpu_collect and args.test_ib:
+        # python3 test.py -cpu_collect 1 -test_ib 1 
+        print("Transports: IBV, Channel: BASIC")
+        rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['basic'])
+    elif args.cpu_collect:
+        # python3 test.py -cpu_collect 1 -test_ib 0
+        print("Transports: UV, Channel: MPT_UV")
+        rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['mpt_uv'])
+    elif args.test_ib:
+        # python3 test.py -cpu_collect 0 -test_ib 1
+        print("Transports: IBV, Channel: CUDA_BASIC")
+        rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
+    else:
+        # python3 test.py -cpu_collect 0 -test_ib 0
+        print("Transports: UV, Channel: CUDA_BASIC")
+        rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['uv'], _channels=['cuda_basic'])
+
+    if args.cpu_collect and args.cpu_collect_gpu_send:
+
+        # python3 test.py -cpu_collect 1 -test_ib 1 -cpu_collect_gpu_send 1
+        print("CPU Collect and GPU Send,  Update To: Transports: IBV, Channel: CUDA_BASIC")
+        rpc_option = torch.distributed.rpc.TensorPipeRpcBackendOptions(device_maps=device_map, _transports=['ibv'], _channels=['cuda_basic'])
     if order_transform is not None:
         order_transform = order_transform.to(local_rank)
     if args.cpu_collect_gpu_send:
