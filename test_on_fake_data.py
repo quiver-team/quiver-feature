@@ -6,6 +6,7 @@ import argparse
 import os
 import time
 import torch.distributed.rpc as rpc
+import numpy as np
 
 
 """
@@ -90,7 +91,7 @@ SAMPLE_SIZE = 80000
 # Init With Numpy
 ########################
 torch.cuda.set_device(args.local_rank)
-cached_ratio = 0.2
+cached_ratio = 0.0
 cached_range = Range(0, int(cached_ratio * NUM_ELEMENT * args.world_size // args.device_per_node))
 UNCACHED_NUM_ELEMENT = (NUM_ELEMENT * args.world_size // args.device_per_node - cached_range.end) // (args.world_size // args.device_per_node)
 
@@ -99,7 +100,8 @@ host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEA
 
 tensor = torch.from_numpy(host_tensor).type(torch.float32)
 
-shard_tensor_config = ShardTensorConfig({args.local_rank:"4G"})
+
+shard_tensor_config = ShardTensorConfig({})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
 
@@ -137,18 +139,24 @@ for idx in range(warm_up):
 
 test_count = 100
 consumed_time = 0
+data_times = []
 for idx in range(test_count):
     start = time.time()
     data = dist_feature[indices]
     data = data.cuda()
     torch.cuda.synchronize()
-    consumed_time += time.time() - start
+    data_times.append(time.time() - start)
 
 data_cpu = data.cpu()
 indices_cpu = indices.cpu()
 data_gt = whole_tensor[indices_cpu]
 
 assert torch.equal(data_gt, data_cpu)
-print(f"Bandwidth in Rank {args.rank} = {test_count * torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time  }GB/s")
+
+data_times = np.array(data_times)
+data_times = np.sort(data_times)
+data_times = data_times[int(0.1 * test_count): -int(0.1 * test_count)]
+consumed_time = np.sum(data_times)
+print(f"Bandwidth in Rank {args.rank} = {data_times.shape[0] * torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time  }GB/s")
 time.sleep(10)
 rpc.shutdown()
