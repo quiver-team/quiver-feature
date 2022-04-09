@@ -133,6 +133,7 @@ def local_worker(local_rank, train_idx, quiver_sampler, args, quiver_feature, ra
         n_id = n_id.to(local_rank)
         start = time.time()
         collected_feature = dist_feature[n_id]
+        torch.cuda.synchronize()
         time_list.append(time.time() - start)
         collected_lst.append(torch.numel(collected_feature) * 4)
     
@@ -150,7 +151,11 @@ def local_worker(local_rank, train_idx, quiver_sampler, args, quiver_feature, ra
 # Load Data
 ########################
 train_idx, csr_topo, quiver_sampler = load_topo_paper100M()
-cached_ratio = 0.2
+if args.test_original:
+    cached_ratio = 0
+else:
+    cached_ratio = 0.2
+
 cached_range = Range(0, int(cached_ratio * csr_topo.node_count))
 UNCACHED_NUM_ELEMENT = (csr_topo.node_count - cached_range.end) // (args.world_size // args.device_per_node)
 range_list = []
@@ -168,12 +173,11 @@ else:
     feat, order_transform = load_feat_paper100M()
 local_feature = torch.cat((feat[:cached_range.end, :], feat[range_list[args.start_rank].start: range_list[args.start_rank].end, :]))
 
-device_config = {}
-for local_rank in range(args.device_per_node):
-    device_config[local_rank] = "8G"
-
-quiver_feature = quiver.Feature(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="device_replicate")
-quiver_feature.from_cpu_tensor(local_feature)
+if args.cpu_collect:
+    quiver_feature = local_feature
+else:
+    quiver_feature = quiver.Feature(0, device_list=list(range(args.device_per_node)), device_cache_size=0, cache_policy="device_replicate")
+    quiver_feature.from_cpu_tensor(local_feature)
 
 
 print(f"Whole Tensor Shape: {feat.shape}")
