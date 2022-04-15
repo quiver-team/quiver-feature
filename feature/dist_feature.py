@@ -133,7 +133,7 @@ class DistFeature(object):
             feature[local_part_orders] = self.collect(local_request_nodes)
 
         end_time = time.time()
-        print(f"{self.rank}:\tMemory Allocation Time = {end_time - start_time}")  
+        print(f"{self.rank}:\tLocal Collect Time = {end_time - start_time}")  
 
         start = time.time()
         for task in task_list:
