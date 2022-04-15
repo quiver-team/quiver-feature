@@ -143,8 +143,10 @@ data_times = []
 for idx in range(test_count):
     start = time.time()
     data = dist_feature[indices]
+    start_time = time.time()
     data = data.cuda()
     torch.cuda.synchronize()
+    print(f"{args.rank}:\tMemory To GPU Time: {time.time() - start_time}")
     data_times.append(time.time() - start)
 
 data_cpu = data.cpu()

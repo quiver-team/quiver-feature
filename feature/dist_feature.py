@@ -83,6 +83,7 @@ class DistFeature(object):
 
     def __getitem__(self, nodes):
 
+        start_time = time.time()
         task_list: List[Task] = []
         if self.order_transform is not None:
             nodes = self.order_transform[nodes]
@@ -100,14 +101,20 @@ class DistFeature(object):
                     fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
                     task_list.append(Task(part_orders, fut))
         
+        end_time = time.time()
+        print(f"{self.rank}:\tRequest Distpatch Time = {end_time - start_time}")
+
+        start_time = time.time()
         if nodes.is_cuda or self.debug_params.get("cpu_collect_gpu_send", 0):
             feature = torch.zeros(nodes.shape[0], self.shard_tensor.shape[1], device = nodes.device)
         else:
             # TODO: Just For Debugging
             feature = torch.empty(nodes.shape[0], self.shard_tensor.shape[1])
 
+        end_time = time.time()
+        print(f"{self.rank}:\tMemory Allocation Time = {end_time - start_time}")  
 
-        start = time.time()
+        start_time = time.time()
         # Load Cached Data
         if self.cached_range.end > 0:
             request_nodes_mask = (nodes >= self.cached_range.start) & (nodes < self.cached_range.end)
@@ -124,6 +131,9 @@ class DistFeature(object):
         local_part_orders = torch.masked_select(input_orders, request_nodes_mask)
         if local_request_nodes.shape[0] > 0:
             feature[local_part_orders] = self.collect(local_request_nodes)
+
+        end_time = time.time()
+        print(f"{self.rank}:\tMemory Allocation Time = {end_time - start_time}")  
 
         start = time.time()
         for task in task_list:
