@@ -8,7 +8,16 @@ namespace qvf{
             int rank;
         
         public:
+        ComEndPoint(){}
+        
         ComEndPoint(int rank, std::string ip_address, int port): rank(rank), ip_address(ip_address), port(port){}
+
+        void set_data(int rank, std::string ip_address, int port){
+            this->rank = rank;
+            this->ip_address = ip_address;
+            this->port = port;
+        }
+
         std::string get_address(void){
             return ip_address;
         }

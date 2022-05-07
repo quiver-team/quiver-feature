@@ -486,10 +486,12 @@ void QueuePair::read(infinity::memory::Buffer* buffer, uint64_t localOffset, inf
 	INFINITY_DEBUG("[INFINITY][QUEUES][QUEUEPAIR] Read request created (id %lu).\n", workRequest.wr_id);
 
 }
-void QueuePair::multiRead(infinity::memory::Buffer *buffer,
-                        std::vector<uint64_t> &localOffset,
+void QueuePair::multiRead(
+						uint32_t batch_size,
+						infinity::memory::Buffer *buffer,
+                        uint64_t* localOffset,
                         infinity::memory::RegionToken *source,
-                        std::vector<uint64_t> &remoteOffset,
+                        uint64_t* remoteOffset,
                         uint32_t sizeInBytes, OperationFlags send_flags,
                         infinity::requests::RequestToken *requestToken,
                         infinity::queues::SendRequestBuffer &send_buffer) {
@@ -501,9 +503,8 @@ void QueuePair::multiRead(infinity::memory::Buffer *buffer,
 
   send_buffer.reset();
   struct ibv_send_wr *badWorkRequest;
-  int n = localOffset.size();
 
-  for (size_t i = 0; i < n; i++) {
+  for (size_t i = 0; i < batch_size; i++) {
     send_buffer.sges[i].addr = buffer->getAddress() + localOffset[i];
     send_buffer.sges[i].length = sizeInBytes;
     send_buffer.sges[i].lkey = buffer->getLocalKey();
@@ -515,12 +516,12 @@ void QueuePair::multiRead(infinity::memory::Buffer *buffer,
         source->getAddress() + remoteOffset[i];
     send_buffer.requests[i].wr.rdma.rkey = source->getRemoteKey();
     send_buffer.requests[i].next =
-        (i == n - 1) ? nullptr : &send_buffer.requests[i + 1];
+        (i == batch_size - 1) ? nullptr : &send_buffer.requests[i + 1];
   }
   if (requestToken != NULL) {
-    send_buffer.requests[n - 1].wr_id =
+    send_buffer.requests[batch_size - 1].wr_id =
         reinterpret_cast<uint64_t>(requestToken);
-    send_buffer.requests[n - 1].send_flags |= IBV_SEND_SIGNALED;
+    send_buffer.requests[batch_size - 1].send_flags |= IBV_SEND_SIGNALED;
   }
 
   INFINITY_ASSERT(sizeInBytes <=

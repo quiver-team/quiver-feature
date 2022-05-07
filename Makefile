@@ -18,8 +18,8 @@ LD_FLAGS		= -linfinity -libverbs
 
 ##################################################
 
-SOURCE_FOLDER		= csrc/include
-BUILD_FOLDER		= infinity_build
+SOURCE_FOLDER		= csrc/include/
+BUILD_FOLDER		= build/infinity
 RELEASE_FOLDER	= infinity_release
 INCLUDE_FOLDER	= include
 EXAMPLES_FOLDER	=  infinity/
