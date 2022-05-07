@@ -1,4 +1,4 @@
-from feature import DistFeature, Range
+from quiver_feature import DistFeature, Range
 import torch
 import numpy as np
 from quiver.shard_tensor import ShardTensorConfig, ShardTensor
