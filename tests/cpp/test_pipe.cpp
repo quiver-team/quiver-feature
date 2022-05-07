@@ -26,6 +26,10 @@
 #include <infinity/queues/QueuePairFactory.h>
 #include <infinity/requests/RequestToken.h>
 
+#include <qvf/pipe.h>
+#include <qvf/com_endpoint.h>
+#include <qvf/range.h>
+
 #define PORT_NUMBER 3344
 #define SERVER_IP "155.198.152.17"
 
@@ -169,26 +173,11 @@ int main(int argc, char **argv) {
     delete bufferToReceive;
 
   } else {
-
-    std::vector<uint64_t> local_offsets(POST_LIST_SIZE, 0);
-    std::vector<uint64_t> remote_offsets(POST_LIST_SIZE, 0);
-    infinity::queues::SendRequestBuffer send_buffer(POST_LIST_SIZE);
-    infinity::queues::IbvWcBuffer wc_buffer = infinity::queues::IbvWcBuffer(CTX_POLL_BATCH);
-    int epoch_scnt = 0;
-
-    printf("Connecting to remote node\n");
-    std::vector<infinity::memory::RegionToken *> remoteBufferTokens;
-    remoteBufferTokens.resize(QP_NUM);
-    for(int qp_index = 0; qp_index < QP_NUM; qp_index ++){
-        qps[qp_index] = qpFactory->connectToRemoteHost(SERVER_IP, PORT_NUMBER);
-        remoteBufferTokens[qp_index] = (infinity::memory::RegionToken *)qps[qp_index]->getUserData();
-    }
-
-    int REQUEST_BUFFER_SIZE = TX_DEPTH / CQ_MOD / POST_LIST_SIZE;
-    std::vector<infinity::requests::RequestToken *> requests;
-    for (int i = 0; i < REQUEST_BUFFER_SIZE; i++) {
-      requests.push_back(new infinity::requests::RequestToken(context));
-    }
+    
+    qvf::ComEndPoint endpoint(0, SERVER_IP, PORT_NUMBER);
+    qvf::PipeParam pipe_param(QP_NUM, CQ_MOD, CTX_POLL_BATCH, TX_DEPTH, POST_LIST_SIZE);
+    qvf::Pipe quiver_pipe(context, endpoint, pipe_param);
+    quiver_pipe.connect();
 
 
     printf("Creating buffers\n");
@@ -201,95 +190,51 @@ int main(int argc, char **argv) {
     printf("Reading content from remote buffer\n");
     infinity::requests::RequestToken requestToken(context);
 
-    // warm up
-
-    printf("Warm up\n");
-    for (int k = 0; k < 10; k++) {
-      int request_node = rand() % NODE_COUNT;
-      uint64_t offset = request_node * FEATURE_DIM * FEATURE_TYPE_SIZE;
-      //std::cout << "Getting Data From " << offset << " To " << offset + FEATURE_DIM * FEATURE_TYPE_SIZE << std::endl;
-      qps[k % QP_NUM]->read(buffer1Sided, offset, remoteBufferTokens[k % QP_NUM], offset, FEATURE_DIM * FEATURE_TYPE_SIZE,
-                infinity::queues::OperationFlags(), requests[k % REQUEST_BUFFER_SIZE]);
-      requests[k % REQUEST_BUFFER_SIZE]->waitUntilCompleted();
-    }
 
     printf("Start Real Test \n");
     //auto start = std::chrono::system_clock::now();
     struct timeval start, stop;
     uint64_t time_consumed = 0;
+    std::vector<uint64_t> local_offsets(TEST_COUNT * POST_LIST_SIZE);
+    std::vector<uint64_t> remote_offsets(TEST_COUNT * POST_LIST_SIZE);
     if(sort_index){
-      for(int iter_index = 0; iter_index < ITER_NUM; iter_index ++){
-        std::vector<int> all_request_nodes(TEST_COUNT * POST_LIST_SIZE);
-        for(int i=0; i < TEST_COUNT * POST_LIST_SIZE; i ++){
-            all_request_nodes[i] = rand() % NODE_COUNT;
-        }
-        std::sort(all_request_nodes.begin(), all_request_nodes.end());
-        gettimeofday(&start, NULL);
+        for(int iter_index = 0; iter_index < ITER_NUM; iter_index ++){
+            std::vector<int> all_request_nodes(TEST_COUNT * POST_LIST_SIZE);
+            for(int i=0; i < TEST_COUNT * POST_LIST_SIZE; i ++){
+                all_request_nodes[i] = rand() % NODE_COUNT;
+            }
+            std::sort(all_request_nodes.begin(), all_request_nodes.end());
+            for(int i=0; i < TEST_COUNT * POST_LIST_SIZE; i ++){
+                uint64_t remote_node_offset = all_request_nodes[i] * FEATURE_DIM * FEATURE_TYPE_SIZE;
+                local_offsets[i] = remote_node_offset;
+                remote_offsets[i] = remote_node_offset;
+            }
+            gettimeofday(&start, NULL);
 
-        for (int k = 0; k < TEST_COUNT; k++) {
-          for(int multi_read_index = 0; multi_read_index < POST_LIST_SIZE; multi_read_index ++){
-              uint64_t remote_node_offset = all_request_nodes[k * POST_LIST_SIZE + multi_read_index] * FEATURE_DIM * FEATURE_TYPE_SIZE;
-              local_offsets[multi_read_index] = remote_node_offset;
-              remote_offsets[multi_read_index] = remote_node_offset;
-          }
-
-          if(k % CQ_MOD ==  CQ_MOD -1){
-              qps[k % QP_NUM]->multiRead(POST_LIST_SIZE, buffer1Sided, &local_offsets[0], remoteBufferTokens[k % QP_NUM], &remote_offsets[0], FEATURE_DIM * FEATURE_TYPE_SIZE,
-                          infinity::queues::OperationFlags(), requests[epoch_scnt], send_buffer);
-              epoch_scnt += 1;
-              
-          }else{
-              qps[k % QP_NUM]->multiRead(POST_LIST_SIZE, buffer1Sided, &local_offsets[0], remoteBufferTokens[k % QP_NUM], &remote_offsets[0], FEATURE_DIM * FEATURE_TYPE_SIZE,
-                          infinity::queues::OperationFlags(), nullptr, send_buffer);
-          }
-          if(epoch_scnt ==  REQUEST_BUFFER_SIZE){
-            epoch_scnt = 0;
-            context->batchPollSendCompletionQueue(CTX_POLL_BATCH, REQUEST_BUFFER_SIZE, wc_buffer.ptr());
-          }
+            quiver_pipe.read(buffer1Sided, local_offsets, remote_offsets, FEATURE_DIM * FEATURE_TYPE_SIZE);
+            gettimeofday(&stop, NULL);
+            time_consumed += timeDiff(stop, start);
         }
-        gettimeofday(&stop, NULL);
-        time_consumed += timeDiff(stop, start);
-      }
-      
     }
     else{
-      gettimeofday(&start, NULL);
-      for(int iter_index = 0; iter_index < ITER_NUM; iter_index++){
-        for (int k = 0; k < TEST_COUNT; k++) {
-            for(int multi_read_index = 0; multi_read_index < POST_LIST_SIZE; multi_read_index ++){
-                int request_node = (k + multi_read_index) % NODE_COUNT;
+        for(int iter_index = 0; iter_index < ITER_NUM; iter_index++){
+            for (int k = 0; k < TEST_COUNT * POST_LIST_SIZE; k++) {
+                int request_node = k % NODE_COUNT;
                 if(random){
                     request_node = rand() % NODE_COUNT;
                 }
                 uint64_t remote_node_offset = request_node * FEATURE_DIM * FEATURE_TYPE_SIZE;
-                local_offsets[multi_read_index] = remote_node_offset;
-                remote_offsets[multi_read_index] = remote_node_offset;
+                local_offsets[k] = remote_node_offset;
+                remote_offsets[k] = remote_node_offset;
             }
-
-            if(k % CQ_MOD ==  CQ_MOD -1){
-              qps[k % QP_NUM]->multiRead(POST_LIST_SIZE, buffer1Sided, &local_offsets[0], remoteBufferTokens[k % QP_NUM], &remote_offsets[0], FEATURE_DIM * FEATURE_TYPE_SIZE,
-                          infinity::queues::OperationFlags(), requests[epoch_scnt], send_buffer);
-              epoch_scnt += 1;
-              
-          }else{
-              qps[k % QP_NUM]->multiRead(POST_LIST_SIZE, buffer1Sided, &local_offsets[0], remoteBufferTokens[k % QP_NUM], &remote_offsets[0], FEATURE_DIM * FEATURE_TYPE_SIZE,
-                          infinity::queues::OperationFlags(), nullptr, send_buffer);
-          }
-            if(epoch_scnt == REQUEST_BUFFER_SIZE){
-              epoch_scnt = 0;
-              context->batchPollSendCompletionQueue(CTX_POLL_BATCH, REQUEST_BUFFER_SIZE, wc_buffer.ptr());
-            }
+            gettimeofday(&start, NULL);
+            quiver_pipe.read(buffer1Sided, local_offsets, remote_offsets, FEATURE_DIM * FEATURE_TYPE_SIZE);
+            gettimeofday(&stop, NULL);
+            time_consumed += timeDiff(stop, start);
         }
-      }
-      gettimeofday(&stop, NULL);
-      time_consumed += timeDiff(stop, start);
     }
 
     printf("Avg Bandwidth is %f MB/s\n", (POST_LIST_SIZE * TEST_COUNT *  FEATURE_DIM * FEATURE_TYPE_SIZE * ITER_NUM / (1024.0 * 1024.0) )/ (((double) time_consumed) / 1000000L) );
-
-    printf("Sending message to remote host from QueuePair %lld\n", QP_NUM-1);
-    qps[QP_NUM-1]->send(buffer2Sided, &requestToken);
-    requestToken.waitUntilCompleted();
 
     printf("Memory checking..., Please wait...\n");
     if(!mem_check(client_data_buffer)){
