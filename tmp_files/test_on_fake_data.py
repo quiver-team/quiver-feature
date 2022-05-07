@@ -1,4 +1,4 @@
-from feature import DistFeature, Range
+from quiver_feature import DistFeature, Range
 import torch
 import numpy as np
 from quiver.shard_tensor import ShardTensorConfig, ShardTensor
@@ -6,6 +6,7 @@ import argparse
 import os
 import time
 import torch.distributed.rpc as rpc
+import numpy as np
 
 
 """
@@ -20,6 +21,8 @@ os.environ["NCCL_SOCKET_IFNAME"] = "eth0"
 os.environ["TP_SOCKET_IFNAME"] = "eth0"
 os.environ["GLOO_SOCKET_IFNAME"] = "eth0"
 os.environ["TP_VERBOSE_LOGGING"] = "0"
+
+
 
 
 
@@ -97,6 +100,7 @@ host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEA
 
 tensor = torch.from_numpy(host_tensor).type(torch.float32)
 
+
 shard_tensor_config = ShardTensorConfig({})
 shard_tensor = ShardTensor(args.local_rank, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
@@ -123,7 +127,8 @@ print(f"Shard Tensor Shape: {shard_tensor.shape}")
 if args.cpu_collect_gpu_send or not args.cpu_collect:
     indices = indices.to(args.local_rank)
 
-if args.cpu_collect:
+if args.cpu_collect or args.cpu_collect_gpu_send:
+    print(f"Using CPU Collect")
     dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, tensor, range_list, rpc_option, cached_range, **debug_param)
 else:
     dist_feature = DistFeature(args.world_size, args.rank, args.device_per_node, args.local_rank, shard_tensor, range_list, rpc_option, cached_range, **debug_param)
@@ -134,16 +139,26 @@ for idx in range(warm_up):
 
 test_count = 100
 consumed_time = 0
+data_times = []
 for idx in range(test_count):
     start = time.time()
     data = dist_feature[indices]
-    consumed_time += time.time() - start
+    start_time = time.time()
+    data = data.cuda()
+    torch.cuda.synchronize()
+    print(f"{args.rank}:\tMemory To GPU Time: {time.time() - start_time}")
+    data_times.append(time.time() - start)
 
 data_cpu = data.cpu()
 indices_cpu = indices.cpu()
 data_gt = whole_tensor[indices_cpu]
 
 assert torch.equal(data_gt, data_cpu)
-print(f"Bandwidth in Rank {args.rank} = {test_count * torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time  }GB/s")
+
+data_times = np.array(data_times)
+data_times = np.sort(data_times)
+data_times = data_times[int(0.1 * test_count): -int(0.1 * test_count)]
+consumed_time = np.sum(data_times)
+print(f"Bandwidth in Rank {args.rank} = {data_times.shape[0] * torch.numel(data) * 4 / 1024 / 1024 / 1024 / consumed_time  }GB/s")
 time.sleep(10)
 rpc.shutdown()
