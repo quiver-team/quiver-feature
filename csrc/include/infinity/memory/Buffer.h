@@ -13,29 +13,30 @@
 #include <infinity/memory/Region.h>
 #include <infinity/memory/RegisteredMemory.h>
 
+#include <cuda_runtime.h>
+
 namespace infinity {
 namespace memory {
 
 class Buffer : public Region {
+ public:
+  Buffer(infinity::core::Context* context, uint64_t sizeInBytes);
+  Buffer(infinity::core::Context* context, uint64_t sizeInBytes, int device);
+  Buffer(infinity::core::Context* context,
+         infinity::memory::RegisteredMemory* memory,
+         uint64_t offset,
+         uint64_t sizeInBytes);
+  Buffer(infinity::core::Context* context, void* memory, uint64_t sizeInBytes);
+  ~Buffer();
 
-public:
+ public:
+  void* getData();
+  void resize(uint64_t newSize, void* newData = NULL);
 
-	Buffer(infinity::core::Context *context, uint64_t sizeInBytes);
-	Buffer(infinity::core::Context *context, infinity::memory::RegisteredMemory *memory, uint64_t offset, uint64_t sizeInBytes);
-	Buffer(infinity::core::Context *context, void *memory, uint64_t sizeInBytes);
-	~Buffer();
-
-public:
-
-	void * getData();
-	void resize(uint64_t newSize, void *newData = NULL);
-
-protected:
-
-	bool memoryRegistered;
-	bool memoryAllocated;
-
-
+ protected:
+  bool memoryRegistered;
+  bool memoryAllocated;
+  bool cuda;
 };
 
 } /* namespace memory */

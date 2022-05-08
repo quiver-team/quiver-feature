@@ -19,7 +19,7 @@ struct CollectionTask {
  public:
   CollectionTask() {}
   CollectionTask(void* base_address,
-                 uint64_t local_offsets,
+                 uint64_t* local_offsets,
                  uint64_t* remote_offsets,
                  uint64_t size,
                  int collect_from)
@@ -68,7 +68,7 @@ class DistTensor {
         local_range(local_range),
         stride_in_bytes(stride_in_bytes) {
     size_in_bytes =
-        (local_range.range_end() - local_range.range_start) * stride_in_bytes;
+        (local_range.range_end() - local_range.range_start()) * stride_in_bytes;
   }
 
   void init_comm(int world_size,
@@ -78,8 +78,8 @@ class DistTensor {
     this->world_size = world_size;
     this->rank = local_endpoint.get_rank();
 
-    pipes.resize(world_size);
-    ranges.resize(world_size);
+    // pipes.resize(world_size);
+    // ranges.resize(world_size);
     com_endpoints.resize(world_size);
     ranges[rank] = local_range;
     com_endpoints[rank] = local_endpoint;
@@ -89,7 +89,7 @@ class DistTensor {
     qpFactory = new infinity::queues::QueuePairFactory(context);
     feature_buffer =
         new infinity::memory::Buffer(context, feature_data, size_in_bytes);
-    server_thread = std::thread(start_feature_server);
+    server_thread = std::thread(&DistTensor::start_feature_server, this);
   }
   void connect(ComEndPoint remote_endpoint, Range remote_range) {
     ranges[remote_endpoint.get_rank()] = remote_range;
