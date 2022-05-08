@@ -21,7 +21,7 @@ pipe_param = qvf.PipeParam(QP_NUM, CQ_MOD, CTX_POLL_BATCH, TX_DEPTH, POST_LIST_S
 local_tensor_endpoint = qvf.TensorEndPoint(SERVER_IP, PORT_NUMBER, 0, 0, 0)
 remote_tensor_endpoint = qvf.TensorEndPoint(SERVER_IP, PORT_NUMBER, 1, 0, 0)
 dist_tensor_client = qvf.DistTensorClient(0, [local_tensor_endpoint, remote_tensor_endpoint], pipe_param)
-registered_tensor = dist_tensor_client.create_registered_float32_tensor([SAMPLE_NUM, FEATURE_DIM])
+registered_tensor = dist_tensor_client.create_registered_float32_tensor_cuda([SAMPLE_NUM, FEATURE_DIM], 0)
 
 print("Before Collect, Check RegisteredTensor ", registered_tensor)
 local_idx = torch.arange(0, SAMPLE_NUM, dtype=torch.int64)
@@ -31,6 +31,8 @@ local_offsets  = local_idx * FEATURE_DIM * FEATURE_TYPE_SIZE
 remote_offsets = remote_idx * FEATURE_DIM * FEATURE_TYPE_SIZE
 
 dist_tensor_client.sync_read(1, registered_tensor, local_offsets, remote_offsets)
+
+registered_tensor = registered_tensor.to('cpu')
 
 for row in range(SAMPLE_NUM):
     if not all(registered_tensor[row] == remote_idx[row]):
