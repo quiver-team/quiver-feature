@@ -36,6 +36,4 @@ int main(int argc, char** argv) {
     printf("Testing DistTensorServer ...\n");
     test_dist_tensor_server(argc, argv);
   }
-  // test_dist_tensor_client(argc, argv);
-  //  test_dist_tensor_server(argc, argv);
 }
