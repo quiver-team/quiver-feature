@@ -63,6 +63,7 @@ class Pipe {
   std::vector<infinity::requests::RequestToken*> requests;
   infinity::queues::SendRequestBuffer send_buffer;
   infinity::core::Context* context;
+  infinity::queues::QueuePairFactory* qpFactory;
   infinity::queues::IbvWcBuffer wc_buffer;
   int requests_size;
   bool connected;
@@ -70,9 +71,11 @@ class Pipe {
  public:
   Pipe() : connected(false) {}
   Pipe(infinity::core::Context* context,
+       infinity::queues::QueuePairFactory* qpFactory,
        ComEndPoint com_endpoint,
        PipeParam pipe_param) {
     this->context = context;
+    this->qpFactory = qpFactory;
     this->remote_end = com_endpoint;
     this->pipe_param = pipe_param;
     connected = false;
@@ -85,6 +88,8 @@ class Pipe {
     this->remote_end = pipe.remote_end;
     this->pipe_param = pipe.pipe_param;
     this->context = pipe.context;
+    this->qpFactory = pipe.qpFactory;
+    connected = false;
     return *this;
   }
 
@@ -95,9 +100,6 @@ class Pipe {
     requests.resize(requests_size);
     send_buffer.resize(pipe_param.post_list_size);
     wc_buffer.resize(pipe_param.ctx_poll_batch);
-
-    infinity::queues::QueuePairFactory* qpFactory =
-        new infinity::queues::QueuePairFactory(context);
     for (int qp_index = 0; qp_index < pipe_param.qp_num; qp_index++) {
       qps[qp_index] = qpFactory->connectToRemoteHost(
           remote_end.get_address().c_str(), remote_end.get_port());
@@ -111,8 +113,8 @@ class Pipe {
   }
 
   void read(infinity::memory::Buffer* local_buffer,
-            std::vector<uint64_t> local_offsets,
-            std::vector<uint64_t> remote_offsets,
+            std::vector<int64_t> local_offsets,
+            std::vector<int64_t> remote_offsets,
             uint64_t stride) {
     uint64_t post_list_cnt =
         (local_offsets.size() + pipe_param.post_list_size - 1) /
@@ -168,8 +170,8 @@ class Pipe {
         remote_offsets_tensor.size(0) == local_offsets_tensor.size(0),
         "local_offsets and remote_offsets should have the same length");
 
-    uint64_t* local_offsets = local_offsets_tensor.data_ptr<uint64_t>();
-    uint64_t* remote_offsets = remote_offsets_tensor.data_ptr<uint64_t>();
+    int64_t* local_offsets = local_offsets_tensor.data_ptr<int64_t>();
+    int64_t* remote_offsets = remote_offsets_tensor.data_ptr<int64_t>();
 
     uint64_t post_list_cnt =
         (local_offsets_tensor.size(0) + pipe_param.post_list_size - 1) /
@@ -185,24 +187,30 @@ class Pipe {
                                    (pipe_param.post_list_size * post_index))
                                 : pipe_param.post_list_size;
       // std::cout<<"Check Batch_Read_Size " << batch_read_size << std::endl;
-      // std::cout<<"Check Current Index " << pipe_param.post_list_size *
-      // post_index <<" Total Size " << local_offsets.size()<<std::endl;
+      std::cout << "Check Dst Location "
+                << local_offsets[post_index * pipe_param.post_list_size]
+                << std::endl;
+      std::cout << "Check Src Location "
+                << remote_offsets[post_index * pipe_param.post_list_size]
+                << std::endl;
+
+      // post_index <<" Total Size " << local_offsets_tensor.size(0)<<std::endl;
       if (post_index == post_list_cnt - 1 ||
           post_index % pipe_param.cq_mode == (pipe_param.cq_mode - 1)) {
         qps[post_index % pipe_param.qp_num]->multiRead(
             batch_read_size, local_buffer,
-            local_offsets + post_index * pipe_param.post_list_size,
+            &local_offsets[post_index * pipe_param.post_list_size],
             remote_buffer_token,
-            remote_offsets + post_index * pipe_param.post_list_size, stride,
+            &remote_offsets[post_index * pipe_param.post_list_size], stride,
             infinity::queues::OperationFlags(), requests[epoch_scnt],
             send_buffer);
         epoch_scnt += 1;
       } else {
         qps[post_index % pipe_param.qp_num]->multiRead(
             batch_read_size, local_buffer,
-            local_offsets + post_index * pipe_param.post_list_size,
+            &local_offsets[post_index * pipe_param.post_list_size],
             remote_buffer_token,
-            remote_offsets + post_index * pipe_param.post_list_size, stride,
+            &remote_offsets[post_index * pipe_param.post_list_size], stride,
             infinity::queues::OperationFlags(), nullptr, send_buffer);
       }
       if (epoch_scnt == requests_size || post_index == post_list_cnt - 1) {

@@ -40,7 +40,7 @@
 #define ITER_NUM 10LL
 #define POST_LIST_SIZE 16LL
 #define CQ_MOD 16LL
-#define QP_NUM 16LL
+#define QP_NUM 1LL
 #define TX_DEPTH 2048LL
 #define CTX_POLL_BATCH 16LL
 int min(int a, int b) {
@@ -93,13 +93,14 @@ bool mem_check(uint8_t* data_buffer) {
   for (u_int64_t start = 0;
        start < NODE_COUNT * FEATURE_DIM * FEATURE_TYPE_SIZE;
        start += FEATURE_DIM * FEATURE_TYPE_SIZE) {
+    int expected_value = (*((int*)(data_buffer + start)) == 0) ? 0 : index;
     for (int dim = 0; dim < FEATURE_DIM; dim++) {
       // std::cout<< *((int*)(data_buffer + start + dim * FEATURE_TYPE_SIZE))<<
       // " ";
-      if (*((int*)(data_buffer + start + dim * FEATURE_TYPE_SIZE)) != 0 &&
-          *((int*)(data_buffer + start + dim * FEATURE_TYPE_SIZE)) != index) {
+      if (*((int*)(data_buffer + start + dim * FEATURE_TYPE_SIZE)) !=
+          expected_value) {
         fprintf(stderr, "At %lld: Epected %d, But got %d\n",
-                start / FEATURE_DIM * FEATURE_TYPE_SIZE, index,
+                start / FEATURE_DIM * FEATURE_TYPE_SIZE, expected_value,
                 *((int*)(data_buffer + start + dim * FEATURE_TYPE_SIZE)));
         return false;
       }
@@ -148,7 +149,7 @@ void test_pipe(int argc, char** argv) {
   qvf::ComEndPoint endpoint(0, SERVER_IP, PORT_NUMBER);
   qvf::PipeParam pipe_param(QP_NUM, CQ_MOD, CTX_POLL_BATCH, TX_DEPTH,
                             POST_LIST_SIZE);
-  qvf::Pipe quiver_pipe(context, endpoint, pipe_param);
+  qvf::Pipe quiver_pipe(context, qpFactory, endpoint, pipe_param);
   quiver_pipe.connect();
 
   printf("Creating buffers\n");
@@ -167,8 +168,8 @@ void test_pipe(int argc, char** argv) {
   // auto start = std::chrono::system_clock::now();
   struct timeval start, stop;
   uint64_t time_consumed = 0;
-  std::vector<uint64_t> local_offsets(TEST_COUNT * POST_LIST_SIZE);
-  std::vector<uint64_t> remote_offsets(TEST_COUNT * POST_LIST_SIZE);
+  std::vector<int64_t> local_offsets(TEST_COUNT * POST_LIST_SIZE);
+  std::vector<int64_t> remote_offsets(TEST_COUNT * POST_LIST_SIZE);
   if (sort_index) {
     for (int iter_index = 0; iter_index < ITER_NUM; iter_index++) {
       std::vector<int> all_request_nodes(TEST_COUNT * POST_LIST_SIZE);

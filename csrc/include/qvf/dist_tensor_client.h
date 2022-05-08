@@ -39,7 +39,7 @@ struct CollectionTask {
         collect_from(collect_from) {}
 };
 class DistTensorClient {
- private:
+ public:
   std::vector<Pipe> pipes;
   std::vector<TensorEndPoint> tensor_endpoints;
 
@@ -70,15 +70,21 @@ class DistTensorClient {
   }
 
   void init_connection() {
+    context = new infinity::core::Context();
+    qpFactory = new infinity::queues::QueuePairFactory(context);
+    pipes.resize(server_size);
     for (int idx = 0; idx < server_size; idx++) {
-      pipes[tensor_endpoints[idx].com_endpoint.get_rank()] =
-          Pipe(context, tensor_endpoints[idx].com_endpoint, pipe_param);
+      if (tensor_endpoints[idx].com_endpoint.get_rank() == server_rank) {
+        continue;
+      }
+      pipes[tensor_endpoints[idx].com_endpoint.get_rank()] = Pipe(
+          context, qpFactory, tensor_endpoints[idx].com_endpoint, pipe_param);
       pipes[tensor_endpoints[idx].com_endpoint.get_rank()].connect();
     }
   }
 
   torch::Tensor create_registered_float32_tensor(
-      std::vector<uint64_t> tensor_shape) {
+      std::vector<int64_t> tensor_shape) {
     QUIVER_FEATURE_ASSERT(tensor_shape.size() == 2,
                           "Only support 2-dimensional tensor");
     auto tensor_option = torch::TensorOptions().dtype(torch::kFloat32);
@@ -92,16 +98,17 @@ class DistTensorClient {
                             {tensor_shape[0], tensor_shape[1]}, tensor_option);
   }
 
-  void sync_collect(int server_rank,
-                    torch::Tensor& res_tensor,
-                    torch::Tensor& local_offsets,
-                    torch::Tensor& remote_offsets) {
+  void sync_read(int server_rank,
+                 torch::Tensor& res_tensor,
+                 torch::Tensor& local_offsets,
+                 torch::Tensor& remote_offsets) {
     QUIVER_FEATURE_ASSERT(
         reinterpret_cast<uint64_t>(res_tensor.data_ptr<float>()) ==
             tensor_buffer->getAddress(),
         "Result Tensor is not created from registered buffer");
+
     pipes[server_rank].read(tensor_buffer, local_offsets, remote_offsets,
-                            res_tensor.stride(0));
+                            res_tensor.size(1));
   }
 
   void collect_inner(CollectionTask collection_task) {

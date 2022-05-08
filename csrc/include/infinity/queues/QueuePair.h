@@ -14,28 +14,28 @@
 #include <infinity/core/Context.h>
 #include <infinity/memory/Atomic.h>
 #include <infinity/memory/Buffer.h>
-#include <vector>
 #include <infinity/memory/RegionToken.h>
 #include <infinity/requests/RequestToken.h>
+#include <vector>
 
 namespace infinity {
 namespace queues {
-	class QueuePairFactory;
+class QueuePairFactory;
 }
-}
+}  // namespace infinity
 
 namespace infinity {
 namespace queues {
 struct SendRequestBuffer {
   std::vector<ibv_sge> sges;
   std::vector<ibv_send_wr> requests;
-  SendRequestBuffer(){}
+  SendRequestBuffer() {}
   SendRequestBuffer(int num) {
     sges.resize(num);
     requests.resize(num);
   }
-  void resize(int num){
-	sges.resize(num);
+  void resize(int num) {
+    sges.resize(num);
     requests.resize(num);
   }
   void reset() {
@@ -43,8 +43,8 @@ struct SendRequestBuffer {
     memset(requests.data(), 0, sizeof(ibv_send_wr));
   }
 };
-} // namespace queues
-}
+}  // namespace queues
+}  // namespace infinity
 
 namespace infinity {
 namespace queues {
@@ -52,39 +52,32 @@ namespace queues {
 struct IbvWcBuffer {
   ibv_wc* wc;
   int size_;
-  IbvWcBuffer(){}
+  IbvWcBuffer() {}
   IbvWcBuffer(int size) {
-	wc = (ibv_wc*) malloc(sizeof(ibv_wc) * size);
-	size_ = size;
+    wc = (ibv_wc*)malloc(sizeof(ibv_wc) * size);
+    size_ = size;
   }
-  void resize(int size){
-	wc = (ibv_wc*) malloc(sizeof(ibv_wc) * size);
-	size_ = size;
-  }
-
-  ibv_wc* ptr(){
-	  return wc;
-  }
-  int size(){
-	  return size_;
+  void resize(int size) {
+    wc = (ibv_wc*)malloc(sizeof(ibv_wc) * size);
+    size_ = size;
   }
 
+  ibv_wc* ptr() { return wc; }
+  int size() { return size_; }
 };
-} // namespace queues
-}
-
+}  // namespace queues
+}  // namespace infinity
 
 namespace infinity {
 namespace queues {
 
 class OperationFlags {
-
-public:
+ public:
   bool fenced;
   bool signaled;
   bool inlined;
 
-  OperationFlags() : fenced(false), signaled(false), inlined(false) { };
+  OperationFlags() : fenced(false), signaled(false), inlined(false){};
 
   /**
    * Turn the bools into a bit field.
@@ -93,117 +86,177 @@ public:
 };
 
 class QueuePair {
+  friend class infinity::queues::QueuePairFactory;
 
-	friend class infinity::queues::QueuePairFactory;
+ public:
+  /**
+   * Constructor
+   */
+  QueuePair(infinity::core::Context* context);
 
-public:
+  /**
+   * Destructor
+   */
+  ~QueuePair();
 
-	/**
-	 * Constructor
-	 */
-	QueuePair(infinity::core::Context *context);
+ protected:
+  /**
+   * Activation methods
+   */
 
-	/**
-	 * Destructor
-	 */
-	~QueuePair();
+  void activate(uint16_t remoteDeviceId,
+                uint32_t remoteQueuePairNumber,
+                uint32_t remoteSequenceNumber);
+  void setRemoteUserData(void* userData, uint32_t userDataSize);
 
-protected:
+ public:
+  /**
+   * User data received during connection setup
+   */
 
-	/**
-	 * Activation methods
-	 */
+  bool hasUserData();
+  uint32_t getUserDataSize();
+  void* getUserData();
 
-	void activate(uint16_t remoteDeviceId, uint32_t remoteQueuePairNumber, uint32_t remoteSequenceNumber);
-	void setRemoteUserData(void *userData, uint32_t userDataSize);
+ public:
+  /**
+   * Queue pair information
+   */
 
-public:
+  uint16_t getLocalDeviceId();
+  uint32_t getQueuePairNumber();
+  uint32_t getSequenceNumber();
 
-	/**
-	 * User data received during connection setup
-	 */
+ public:
+  /**
+   * Buffer operations
+   */
 
-	bool hasUserData();
-	uint32_t getUserDataSize();
-	void * getUserData();
+  void send(infinity::memory::Buffer* buffer,
+            infinity::requests::RequestToken* requestToken = NULL);
+  void send(infinity::memory::Buffer* buffer,
+            uint32_t sizeInBytes,
+            infinity::requests::RequestToken* requestToken = NULL);
+  void send(infinity::memory::Buffer* buffer,
+            uint64_t localOffset,
+            uint32_t sizeInBytes,
+            OperationFlags flags,
+            infinity::requests::RequestToken* requestToken = NULL);
 
-public:
+  void write(infinity::memory::Buffer* buffer,
+             infinity::memory::RegionToken* destination,
+             infinity::requests::RequestToken* requestToken = NULL);
+  void write(infinity::memory::Buffer* buffer,
+             infinity::memory::RegionToken* destination,
+             uint32_t sizeInBytes,
+             infinity::requests::RequestToken* requestToken = NULL);
+  void write(infinity::memory::Buffer* buffer,
+             uint64_t localOffset,
+             infinity::memory::RegionToken* destination,
+             uint64_t remoteOffset,
+             uint32_t sizeInBytes,
+             OperationFlags flags,
+             infinity::requests::RequestToken* requestToken = NULL);
 
-	/**
-	 * Queue pair information
-	 */
+  void read(infinity::memory::Buffer* buffer,
+            infinity::memory::RegionToken* source,
+            infinity::requests::RequestToken* requestToken = NULL);
+  void read(infinity::memory::Buffer* buffer,
+            infinity::memory::RegionToken* source,
+            uint32_t sizeInBytes,
+            infinity::requests::RequestToken* requestToken = NULL);
+  void read(infinity::memory::Buffer* buffer,
+            uint64_t localOffset,
+            infinity::memory::RegionToken* source,
+            uint64_t remoteOffset,
+            uint32_t sizeInBytes,
+            OperationFlags flags,
+            infinity::requests::RequestToken* requestToken = NULL);
 
-	uint16_t getLocalDeviceId();
-	uint32_t getQueuePairNumber();
-	uint32_t getSequenceNumber();
+ public:
+  /**
+   * Complex buffer operations
+   */
 
-public:
+  void multiWrite(infinity::memory::Buffer** buffers,
+                  uint32_t* sizesInBytes,
+                  uint64_t* localOffsets,
+                  uint32_t numberOfElements,
+                  infinity::memory::RegionToken* destination,
+                  uint64_t remoteOffset,
+                  OperationFlags flags,
+                  infinity::requests::RequestToken* requestToken = NULL);
 
-	/**
-	 * Buffer operations
-	 */
+  void multiRead(uint32_t batch_size,
+                 infinity::memory::Buffer* buffer,
+                 int64_t* localOffset,
+                 infinity::memory::RegionToken* source,
+                 int64_t* remoteOffset,
+                 uint32_t sizeInBytes,
+                 OperationFlags send_flags,
+                 infinity::requests::RequestToken* requestToken,
+                 infinity::queues::SendRequestBuffer& send_buffer);
 
-	void send(infinity::memory::Buffer *buffer, infinity::requests::RequestToken *requestToken = NULL);
-	void send(infinity::memory::Buffer *buffer, uint32_t sizeInBytes, infinity::requests::RequestToken *requestToken = NULL);
-	void send(infinity::memory::Buffer *buffer, uint64_t localOffset, uint32_t sizeInBytes, OperationFlags flags,
-      infinity::requests::RequestToken *requestToken = NULL);
+  void sendWithImmediate(infinity::memory::Buffer* buffer,
+                         uint64_t localOffset,
+                         uint32_t sizeInBytes,
+                         uint32_t immediateValue,
+                         OperationFlags flags,
+                         infinity::requests::RequestToken* requestToken = NULL);
 
-	void write(infinity::memory::Buffer *buffer, infinity::memory::RegionToken *destination, infinity::requests::RequestToken *requestToken = NULL);
-	void write(infinity::memory::Buffer *buffer, infinity::memory::RegionToken *destination, uint32_t sizeInBytes,
-			infinity::requests::RequestToken *requestToken = NULL);
-	void write(infinity::memory::Buffer *buffer, uint64_t localOffset, infinity::memory::RegionToken *destination, uint64_t remoteOffset, uint32_t sizeInBytes,
-      OperationFlags flags, infinity::requests::RequestToken *requestToken = NULL);
+  void writeWithImmediate(
+      infinity::memory::Buffer* buffer,
+      uint64_t localOffset,
+      infinity::memory::RegionToken* destination,
+      uint64_t remoteOffset,
+      uint32_t sizeInBytes,
+      uint32_t immediateValue,
+      OperationFlags flags,
+      infinity::requests::RequestToken* requestToken = NULL);
 
-	void read(infinity::memory::Buffer *buffer, infinity::memory::RegionToken *source, infinity::requests::RequestToken *requestToken = NULL);
-	void read(infinity::memory::Buffer *buffer, infinity::memory::RegionToken *source, uint32_t sizeInBytes, infinity::requests::RequestToken *requestToken =
-	NULL);
-	void read(infinity::memory::Buffer *buffer, uint64_t localOffset, infinity::memory::RegionToken *source, uint64_t remoteOffset, uint32_t sizeInBytes,
-			OperationFlags flags, infinity::requests::RequestToken *requestToken = NULL);
+  void multiWriteWithImmediate(
+      infinity::memory::Buffer** buffers,
+      uint32_t* sizesInBytes,
+      uint64_t* localOffsets,
+      uint32_t numberOfElements,
+      infinity::memory::RegionToken* destination,
+      uint64_t remoteOffset,
+      uint32_t immediateValue,
+      OperationFlags flags,
+      infinity::requests::RequestToken* requestToken = NULL);
 
-public:
+ public:
+  /**
+   * Atomic value operations
+   */
 
-	/**
-	 * Complex buffer operations
-	 */
+  void compareAndSwap(infinity::memory::RegionToken* destination,
+                      uint64_t compare,
+                      uint64_t swap,
+                      infinity::requests::RequestToken* requestToken = NULL);
+  void compareAndSwap(infinity::memory::RegionToken* destination,
+                      infinity::memory::Atomic* previousValue,
+                      uint64_t compare,
+                      uint64_t swap,
+                      OperationFlags flags,
+                      infinity::requests::RequestToken* requestToken = NULL);
+  void fetchAndAdd(infinity::memory::RegionToken* destination,
+                   uint64_t add,
+                   infinity::requests::RequestToken* requestToken = NULL);
+  void fetchAndAdd(infinity::memory::RegionToken* destination,
+                   infinity::memory::Atomic* previousValue,
+                   uint64_t add,
+                   OperationFlags flags,
+                   infinity::requests::RequestToken* requestToken = NULL);
 
-	void multiWrite(infinity::memory::Buffer **buffers, uint32_t *sizesInBytes, uint64_t *localOffsets, uint32_t numberOfElements,
-			infinity::memory::RegionToken *destination, uint64_t remoteOffset, OperationFlags flags, infinity::requests::RequestToken *requestToken = NULL);
-	
-	void multiRead(uint32_t batch_size, infinity::memory::Buffer *buffer, uint64_t* localOffset, infinity::memory::RegionToken *source, uint64_t* remoteOffset,
-			uint32_t sizeInBytes, OperationFlags send_flags, infinity::requests::RequestToken *requestToken, infinity::queues::SendRequestBuffer &send_buffer);
+ protected:
+  infinity::core::Context* const context;
 
-	void sendWithImmediate(infinity::memory::Buffer *buffer, uint64_t localOffset, uint32_t sizeInBytes, uint32_t immediateValue,
-			OperationFlags flags, infinity::requests::RequestToken *requestToken = NULL);
+  ibv_qp* ibvQueuePair;
+  uint32_t sequenceNumber;
 
-	void writeWithImmediate(infinity::memory::Buffer *buffer, uint64_t localOffset, infinity::memory::RegionToken *destination, uint64_t remoteOffset,
-			uint32_t sizeInBytes, uint32_t immediateValue, OperationFlags flags, infinity::requests::RequestToken *requestToken = NULL);
-
-	void multiWriteWithImmediate(infinity::memory::Buffer **buffers, uint32_t *sizesInBytes, uint64_t *localOffsets, uint32_t numberOfElements,
-			infinity::memory::RegionToken *destination, uint64_t remoteOffset, uint32_t immediateValue, OperationFlags flags, infinity::requests::RequestToken *requestToken = NULL);
-
-public:
-
-	/**
-	 * Atomic value operations
-	 */
-
-	void compareAndSwap(infinity::memory::RegionToken *destination, uint64_t compare, uint64_t swap, infinity::requests::RequestToken *requestToken = NULL);
-	void compareAndSwap(infinity::memory::RegionToken *destination, infinity::memory::Atomic *previousValue, uint64_t compare, uint64_t swap,
-			OperationFlags flags, infinity::requests::RequestToken *requestToken = NULL);
-	void fetchAndAdd(infinity::memory::RegionToken *destination, uint64_t add, infinity::requests::RequestToken *requestToken = NULL);
-	void fetchAndAdd(infinity::memory::RegionToken *destination, infinity::memory::Atomic *previousValue, uint64_t add,
-			OperationFlags flags, infinity::requests::RequestToken *requestToken = NULL);
-
-protected:
-
-	infinity::core::Context * const context;
-
-	ibv_qp* ibvQueuePair;
-	uint32_t sequenceNumber;
-
-	void *userData;
-	uint32_t userDataSize;
-
+  void* userData;
+  uint32_t userDataSize;
 };
 
 } /* namespace queues */

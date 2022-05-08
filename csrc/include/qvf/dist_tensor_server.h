@@ -36,6 +36,7 @@ class DistTensorServer {
     qpFactory = new infinity::queues::QueuePairFactory(context);
     qpFactory->bindToPort(port);
   }
+
   void serve(void* data, uint64_t size_in_bytes) {
     feature_buffer = new infinity::memory::Buffer(context, data, size_in_bytes);
     bufferToken = feature_buffer->createRegionToken();
