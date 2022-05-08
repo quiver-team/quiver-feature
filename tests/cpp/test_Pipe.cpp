@@ -27,6 +27,7 @@
 #include <infinity/requests/RequestToken.h>
 
 #include <qvf/com_endpoint.h>
+#include <qvf/common.h>
 #include <qvf/pipe.h>
 #include <qvf/range.h>
 
@@ -43,6 +44,7 @@
 #define QP_NUM 1LL
 #define TX_DEPTH 2048LL
 #define CTX_POLL_BATCH 16LL
+
 int min(int a, int b) {
   if (a < b) {
     return a;
@@ -55,60 +57,32 @@ uint64_t timeDiff(struct timeval stop, struct timeval start) {
          (start.tv_sec * 1000000L + start.tv_usec);
 }
 
-uint8_t* allocate_feature(bool set_value) {
-  uint8_t* buffer =
-      (uint8_t*)malloc(NODE_COUNT * FEATURE_DIM * FEATURE_TYPE_SIZE);
-  if (set_value) {
-    int index = 0;
-    for (u_int64_t start = 0;
-         start < NODE_COUNT * FEATURE_DIM * FEATURE_TYPE_SIZE;
-         start += FEATURE_DIM * FEATURE_TYPE_SIZE) {
-      for (int dim = 0; dim < FEATURE_DIM; dim++) {
-        *((int*)(buffer + start + dim * FEATURE_TYPE_SIZE)) = index;
-      }
-      index += 1;
-    }
-  } else {
-    memset(buffer, 0, NODE_COUNT * FEATURE_DIM * FEATURE_TYPE_SIZE);
-  }
-  return buffer;
-}
+float* allocate_float_feature(bool set_value);
 
-bool mem_check(uint8_t* data_buffer) {
-  int index = 0;
+bool mem_check(float* data_buffer) {
+  float index = 0;
   bool have_valid_data = false;
-  for (u_int64_t start = 0;
-       start < NODE_COUNT * FEATURE_DIM * FEATURE_TYPE_SIZE;
-       start += FEATURE_DIM * FEATURE_TYPE_SIZE) {
+  for (u_int64_t start = 0; start < NODE_COUNT; start += 1) {
     for (int dim = 0; dim < FEATURE_DIM; dim++) {
-      if (*((int*)(data_buffer + start + dim * FEATURE_TYPE_SIZE)) != 0) {
+      if (data_buffer[start * FEATURE_DIM + dim] != 0) {
         have_valid_data = true;
       }
     }
   }
-  if (!have_valid_data) {
-    fprintf(stderr, "You know, actually no data is copied successfully");
-  }
+  QUIVER_FEATURE_ASSERT(have_valid_data == true, "No valid data is copied")
 
-  for (u_int64_t start = 0;
-       start < NODE_COUNT * FEATURE_DIM * FEATURE_TYPE_SIZE;
-       start += FEATURE_DIM * FEATURE_TYPE_SIZE) {
-    int expected_value = (*((int*)(data_buffer + start)) == 0) ? 0 : index;
-    for (int dim = 0; dim < FEATURE_DIM; dim++) {
-      // std::cout<< *((int*)(data_buffer + start + dim * FEATURE_TYPE_SIZE))<<
-      // " ";
-      if (*((int*)(data_buffer + start + dim * FEATURE_TYPE_SIZE)) !=
-          expected_value) {
-        fprintf(stderr, "At %lld: Epected %d, But got %d\n",
-                start / FEATURE_DIM * FEATURE_TYPE_SIZE, expected_value,
-                *((int*)(data_buffer + start + dim * FEATURE_TYPE_SIZE)));
-        return false;
-      }
+  for (u_int64_t start = 0; start < NODE_COUNT; start += 1) {
+    float expected_value =
+        (data_buffer[start * FEATURE_DIM] == 0) ? 0 : float(start);
+    std::cout << data_buffer[start * FEATURE_DIM] << " ";
+    for (u_int64_t dim = 0; dim < FEATURE_DIM; dim++) {
+      QUIVER_FEATURE_ASSERT(
+          data_buffer[start * FEATURE_DIM + dim] == expected_value,
+          "Result Check Failed At (%lld, %lld)!, Expected %f, Got %f\n", start,
+          dim, expected_value, data_buffer[start * FEATURE_DIM + dim]);
     }
-    // std::cout<<std::endl;
-    index += 1;
   }
-  return have_valid_data & true;
+  return true;
 }
 
 void test_pipe(int argc, char** argv) {
@@ -154,7 +128,7 @@ void test_pipe(int argc, char** argv) {
 
   printf("Creating buffers\n");
   std::vector<infinity::memory::Buffer*> buffers;
-  uint8_t* client_data_buffer = allocate_feature(false);
+  float* client_data_buffer = allocate_float_feature(false);
   infinity::memory::Buffer* buffer1Sided = new infinity::memory::Buffer(
       context, client_data_buffer,
       NODE_COUNT * FEATURE_DIM * FEATURE_TYPE_SIZE);

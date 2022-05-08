@@ -88,7 +88,7 @@ class DistTensorClient {
     QUIVER_FEATURE_ASSERT(tensor_shape.size() == 2,
                           "Only support 2-dimensional tensor");
     auto tensor_option = torch::TensorOptions().dtype(torch::kFloat32);
-    uint64_t size_in_bytes = 1;
+    uint64_t size_in_bytes = 4;
     for (int index = 0; index < tensor_shape.size(); index++) {
       size_in_bytes *= tensor_shape[index];
     }
@@ -108,7 +108,7 @@ class DistTensorClient {
         "Result Tensor is not created from registered buffer");
 
     pipes[server_rank].read(tensor_buffer, local_offsets, remote_offsets,
-                            res_tensor.size(1));
+                            res_tensor.size(1) * 4);
   }
 
   void collect_inner(CollectionTask collection_task) {

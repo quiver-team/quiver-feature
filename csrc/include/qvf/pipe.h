@@ -187,14 +187,13 @@ class Pipe {
                                    (pipe_param.post_list_size * post_index))
                                 : pipe_param.post_list_size;
       // std::cout<<"Check Batch_Read_Size " << batch_read_size << std::endl;
-      std::cout << "Check Dst Location "
-                << local_offsets[post_index * pipe_param.post_list_size]
-                << std::endl;
-      std::cout << "Check Src Location "
-                << remote_offsets[post_index * pipe_param.post_list_size]
-                << std::endl;
 
-      // post_index <<" Total Size " << local_offsets_tensor.size(0)<<std::endl;
+      // std::cout<<"Read "<< batch_read_size <<", From " <<
+      // remote_offsets[post_index * pipe_param.post_list_size] <<" To " <<
+      // local_offsets[post_index * pipe_param.post_list_size] << " With Size "
+      // << stride << std::endl;
+      //  post_index <<" Total Size " <<
+      //  local_offsets_tensor.size(0)<<std::endl;
       if (post_index == post_list_cnt - 1 ||
           post_index % pipe_param.cq_mode == (pipe_param.cq_mode - 1)) {
         qps[post_index % pipe_param.qp_num]->multiRead(
