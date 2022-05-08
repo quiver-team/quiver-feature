@@ -1,4 +1,5 @@
-#rm -rf build
+
+rm -rf build
 mkdir -p build
 cd build
 Torch_DIR=`python -c 'import torch;print(torch.utils.cmake_prefix_path)'` \

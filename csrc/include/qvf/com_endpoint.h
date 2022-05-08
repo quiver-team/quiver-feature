@@ -13,6 +13,13 @@ class ComEndPoint {
   ComEndPoint(int rank, std::string ip_address, int port)
       : rank(rank), ip_address(ip_address), port(port) {}
 
+  ComEndPoint& operator=(const ComEndPoint& other) {
+    this->rank = other.rank;
+    this->ip_address = other.ip_address;
+    this->port = other.port;
+    return *this;
+  }
+
   void set_data(int rank, std::string ip_address, int port) {
     this->rank = rank;
     this->ip_address = ip_address;

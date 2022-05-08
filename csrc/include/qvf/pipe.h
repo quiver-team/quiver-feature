@@ -45,6 +45,11 @@ struct PipeParam {
     this->tx_depth = tx_depth;
     this->post_list_size = post_list_size;
   }
+  PipeParam& operator=(const PipeParam& pipe_param) {
+    set_params(pipe_param.qp_num, pipe_param.cq_mode, pipe_param.ctx_poll_batch,
+               pipe_param.tx_depth, pipe_param.post_list_size);
+    return *this;
+  }
 };
 
 class Pipe {
@@ -58,23 +63,37 @@ class Pipe {
   infinity::core::Context* context;
   infinity::queues::IbvWcBuffer wc_buffer;
   int requests_size;
+  bool connected;
 
  public:
+  Pipe() : connected(false) {}
   Pipe(infinity::core::Context* context,
        ComEndPoint com_endpoint,
        PipeParam pipe_param) {
     this->context = context;
     this->remote_end = com_endpoint;
     this->pipe_param = pipe_param;
+    connected = false;
+  }
+
+  Pipe& operator=(const Pipe& pipe) {
+    if (pipe.connected) {
+      fprintf(stderr, "Pipe can only be assigned before connect");
+    }
+    this->remote_end = pipe.remote_end;
+    this->pipe_param = pipe.pipe_param;
+    this->context = pipe.context;
+    return *this;
+  }
+
+  void connect() {
     qps.resize(pipe_param.qp_num);
     requests_size =
         pipe_param.tx_depth / pipe_param.cq_mode / pipe_param.post_list_size;
     requests.resize(requests_size);
     send_buffer.resize(pipe_param.post_list_size);
     wc_buffer.resize(pipe_param.ctx_poll_batch);
-  }
 
-  void connect() {
     infinity::queues::QueuePairFactory* qpFactory =
         new infinity::queues::QueuePairFactory(context);
     for (int qp_index = 0; qp_index < pipe_param.qp_num; qp_index++) {
@@ -86,6 +105,7 @@ class Pipe {
          request_index++) {
       requests[request_index] = new infinity::requests::RequestToken(context);
     }
+    connected = true;
   }
 
   void read(infinity::memory::Buffer* local_buffer,

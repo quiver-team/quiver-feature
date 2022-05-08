@@ -5,7 +5,7 @@ set(CMAKE_CUDA_STANDARD 14)
 
 set(CMAKE_CUDA_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
-
+set(CMAKE_CUDA_COMPILER /usr/local/cuda/bin/nvcc)
 
 file(GLOB HEADERS csrc/include/qvf/*.h csrc/include/infinity/*.h csrc/include/infinity/core/*.h csrc/include/infinity/memory/*.h csrc/include/infinity/queues/*.h csrc/include/infinity/requests/*.h csrc/include/infinity/utils/*.h)
 file(GLOB SOURCES csrc/src/*.cpp csrc/include/infinity/requests/*.cpp csrc/include/infinity/core/*.cpp csrc/include/infinity/memory/*.cpp csrc/include/infinity/queues/*.cpp csrc/include/infinity/utils/*.cpp)
