@@ -37,8 +37,8 @@ install(TARGETS ${PROJECT_NAME}
 install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})
 
 if(BUILD_TEST)
-  add_executable(test_pipe ${TEST_SOURCES})
-  target_link_libraries(test_pipe PRIVATE ${TORCH_LIBRARIES})
-  target_link_libraries(test_pipe PRIVATE Python3::Python)
-  target_link_libraries(test_pipe PRIVATE ${PROJECT_NAME})
+  add_executable(cpp_test ${TEST_SOURCES})
+  target_link_libraries(cpp_test PRIVATE ${TORCH_LIBRARIES})
+  target_link_libraries(cpp_test PRIVATE Python3::Python)
+  target_link_libraries(cpp_test PRIVATE ${PROJECT_NAME})
 endif()

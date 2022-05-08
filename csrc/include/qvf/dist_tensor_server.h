@@ -27,19 +27,21 @@ class DistTensorServer {
   infinity::memory::Buffer* feature_buffer;
   infinity::memory::RegionToken* bufferToken;
 
-  std::thread serve_thread;
+  std::thread server_thread;
 
  public:
   DistTensorServer(int port, int world_size, int qp_per_pipe)
       : port(port), world_size(world_size), qp_per_pipe(qp_per_pipe) {
     context = new infinity::core::Context();
     qpFactory = new infinity::queues::QueuePairFactory(context);
+    qpFactory->bindToPort(port);
   }
   void serve(void* data, uint64_t size_in_bytes) {
     feature_buffer = new infinity::memory::Buffer(context, data, size_in_bytes);
     bufferToken = feature_buffer->createRegionToken();
-    serve_thread =
+    server_thread =
         std::thread(run, qpFactory, bufferToken, qp_per_pipe * world_size);
+    server_thread.join();
   }
 
   static void run(infinity::queues::QueuePairFactory* qpFactory,
@@ -52,7 +54,7 @@ class DistTensorServer {
     }
     std::cout << "Server starts to serve data" << std::endl;
     while (1) {
-      std::this_thread::sleep_for(std::chrono::seconds(1));  // 1s
+      // std::this_thread::sleep_for(std::chrono::seconds(1));  // 1s
     }
   }
 };
