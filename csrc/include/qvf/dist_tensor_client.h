@@ -98,6 +98,25 @@ class DistTensorClient {
                             {tensor_shape[0], tensor_shape[1]}, tensor_option);
   }
 
+  torch::Tensor create_registered_float32_tensor_cuda(
+      std::vector<int64_t> tensor_shape,
+      int device) {
+    QUIVER_FEATURE_ASSERT(tensor_shape.size() == 2,
+                          "Only support 2-dimensional tensor");
+    uint64_t size_in_bytes = 4;
+    for (int index = 0; index < tensor_shape.size(); index++) {
+      size_in_bytes *= tensor_shape[index];
+    }
+    tensor_buffer =
+        new infinity::memory::Buffer(context, size_in_bytes, device);
+    tensor_token = tensor_buffer->createRegionToken();
+    auto tensor_option = torch::TensorOptions()
+                             .dtype(torch::kFloat32)
+                             .device(torch::kCUDA, device);
+    return torch::from_blob(tensor_buffer->getData(),
+                            {tensor_shape[0], tensor_shape[1]}, tensor_option);
+  }
+
   void sync_read(int server_rank,
                  torch::Tensor& res_tensor,
                  torch::Tensor& local_offsets,

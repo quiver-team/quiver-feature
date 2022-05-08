@@ -27,6 +27,9 @@ void register_DistTensorClient(pybind11::module& m) {
       .def("create_registered_float32_tensor",
            &qvf::DistTensorClient::create_registered_float32_tensor,
            py::call_guard<py::gil_scoped_release>())
+      .def("create_registered_float32_tensor_cuda",
+           &qvf::DistTensorClient::create_registered_float32_tensor_cuda,
+           py::call_guard<py::gil_scoped_release>())
       .def("sync_read", &qvf::DistTensorClient::sync_read,
            py::call_guard<py::gil_scoped_release>());
 }
