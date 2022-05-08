@@ -21,16 +21,16 @@ struct CollectionTask {
  public:
   void* base_address;
   int collect_from;
-  uint64_t* local_offsets;
-  uint64_t* remote_offsets;
-  uint64_t size;
+  int64_t* local_offsets;
+  int64_t* remote_offsets;
+  int64_t size;
 
  public:
   CollectionTask() {}
   CollectionTask(void* base_address,
-                 uint64_t* local_offsets,
-                 uint64_t* remote_offsets,
-                 uint64_t size,
+                 int64_t* local_offsets,
+                 int64_t* remote_offsets,
+                 int64_t size,
                  int collect_from)
       : base_address(base_address),
         local_offsets(local_offsets),

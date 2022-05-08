@@ -27,17 +27,22 @@ WITH_SYMBOLS = True if os.getenv('WITH_SYMBOLS', '0') == '1' else False
 
 def get_extensions():
     extensions = []
-    libraries = []
+    libraries = ['ibverbs']
 
     extensions_dir = osp.join('csrc')
 
     srcs = glob.glob(osp.join(extensions_dir, 'src', '*.cpp'))
     srcs += glob.glob(osp.join(extensions_dir, 'src', '*.cu'))
-    includes = osp.join(extensions_dir, 'include')
+    srcs += glob.glob(osp.join(extensions_dir, 'include',"infinity/core" , '*.cpp'))
+    srcs += glob.glob(osp.join(extensions_dir, 'include',"infinity/memory" , '*.cpp'))
+    srcs += glob.glob(osp.join(extensions_dir, 'include',"infinity/queues" , '*.cpp'))
+    srcs += glob.glob(osp.join(extensions_dir, 'include',"infinity/requests" , '*.cpp'))
+    srcs += glob.glob(osp.join(extensions_dir, 'include',"infinity/utils" , '*.cpp'))
+    includes = osp.join(extensions_dir, 'include/')
     define_macros = [('WITH_PYTHON', None)]
     extra_compile_args = {
-        'cxx': ['-O3', '-std=c++17'],
-        '/usr/local/cuda/bin/nvcc': ['-O3', '--expt-extended-lambda', '-std=c++17']}
+        'cxx': ['-O3', '-std=c++17', '-libverbs'],
+        '/usr/local/cuda/bin/nvcc': ['-O3', '--expt-extended-lambda', '-std=c++17', '-libverbs']}
     extra_link_args = [] if WITH_SYMBOLS else ['-s']
 
     Extension = CUDAExtension

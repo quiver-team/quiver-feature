@@ -4,13 +4,13 @@
 namespace qvf {
 class Range {
  private:
-  uint64_t start;
-  uint64_t end;
+  int64_t start;
+  int64_t end;
 
  public:
   Range() {}
-  Range(uint64_t start, uint64_t end) : start(start), end(end) {}
-  void set_params(uint64_t start, uint64_t end) {
+  Range(int64_t start, int64_t end) : start(start), end(end) {}
+  void set_params(int64_t start, int64_t end) {
     this->start = start;
     this->end = end;
   }
@@ -19,7 +19,7 @@ class Range {
     this->end = other.end;
     return *this;
   }
-  uint64_t range_start() { return start; }
-  uint64_t range_end() { return end; }
+  int64_t range_start() { return start; }
+  int64_t range_end() { return end; }
 };
 }  // namespace qvf

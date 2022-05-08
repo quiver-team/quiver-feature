@@ -15,6 +15,8 @@
 #include <thread>
 #include <vector>
 
+#include <torch/extension.h>
+
 namespace qvf {
 class DistTensorServer {
  private:
@@ -37,8 +39,19 @@ class DistTensorServer {
     qpFactory->bindToPort(port);
   }
 
-  void serve(void* data, uint64_t size_in_bytes) {
-    feature_buffer = new infinity::memory::Buffer(context, data, size_in_bytes);
+  void serve(void* data, int64_t size_in_bytes) {
+    feature_buffer =
+        new infinity::memory::Buffer(context, data, (uint64_t)size_in_bytes);
+    bufferToken = feature_buffer->createRegionToken();
+    server_thread =
+        std::thread(run, qpFactory, bufferToken, qp_per_pipe * world_size);
+    server_thread.join();
+  }
+
+  void serve_tensor(torch::Tensor& data) {
+    uint64_t size_in_bytes = data.numel() * 4;
+    feature_buffer = new infinity::memory::Buffer(
+        context, data.data_ptr<float>(), size_in_bytes);
     bufferToken = feature_buffer->createRegionToken();
     server_thread =
         std::thread(run, qpFactory, bufferToken, qp_per_pipe * world_size);
