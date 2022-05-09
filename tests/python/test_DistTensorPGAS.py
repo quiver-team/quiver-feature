@@ -16,7 +16,7 @@ CACHE_RATIO = 0.0
 
 START_SERVER = 1
 
-IP_LIST = ["155.198.152.17", "155.198.152.17"]
+IP_LIST = ["155.198.152.17", "155.198.152.18"]
 PORT_LIST = [3344, 3344]
 
 
@@ -35,7 +35,7 @@ host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEA
 tensor = torch.from_numpy(host_tensor).type(torch.float32)
 
 
-shard_tensor_config = ShardTensorConfig({})
+shard_tensor_config = ShardTensorConfig({DEVICE_RANK: "8G"})
 shard_tensor = ShardTensor(DEVICE_RANK, shard_tensor_config)
 shard_tensor.from_cpu_tensor(tensor)
 
@@ -83,3 +83,5 @@ data_gt = whole_tensor[indices]
 assert torch.equal(data, data_gt), "Result Check Failed!"
 
 print(f"Result Check Successed! Throughput = {data.numel() * 4 / 1024 / 1024 / consumed} MB/s")
+
+time.sleep(10)
