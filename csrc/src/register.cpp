@@ -5,7 +5,7 @@
 void register_TensorEndPoint(pybind11::module& m) {
   // define TensorEndPoint
   py::class_<qvf::TensorEndPoint>(m, "TensorEndPoint")
-      .def(py::init<std::string, int, int, int64_t, int64_t>());
+      .def(py::init<int, std::string, int, int64_t, int64_t>());
 }
 
 void register_DistTensorServer(pybind11::module& m) {

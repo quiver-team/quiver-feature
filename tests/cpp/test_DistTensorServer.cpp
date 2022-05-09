@@ -11,7 +11,7 @@
 #define ITER_NUM 10LL
 #define POST_LIST_SIZE 16LL
 #define CQ_MOD 16LL
-#define QP_NUM 1LL
+#define QP_NUM 2LL
 #define TX_DEPTH 2048LL
 #define CTX_POLL_BATCH 16LL
 

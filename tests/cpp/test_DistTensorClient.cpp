@@ -14,12 +14,12 @@
 #define NODE_COUNT 120000LL
 #define FEATURE_DIM 256LL
 #define FEATURE_TYPE_SIZE 4LL
-#define SAMPLE_NUM 8096LL
+#define SAMPLE_NUM 80960LL
 #define TEST_COUNT 8192LL
 #define ITER_NUM 10LL
 #define POST_LIST_SIZE 16LL
 #define CQ_MOD 16LL
-#define QP_NUM 1LL
+#define QP_NUM 2LL
 #define TX_DEPTH 2048LL
 #define CTX_POLL_BATCH 16LL
 
@@ -65,6 +65,7 @@ void test_dist_tensor_client(int argc, char** argv) {
 
   torch::Tensor registered_tensor =
       dist_tensor_client.create_registered_float32_tensor(shape);
+
   std::vector<int64_t> local_offsets(SAMPLE_NUM);
   std::vector<int64_t> remote_offsets(SAMPLE_NUM);
 
@@ -91,6 +92,6 @@ void test_dist_tensor_client(int argc, char** argv) {
 
   dist_tensor_client.sync_read(1, registered_tensor, local_offsets_tensor,
                                remote_offsets_tensor);
-  print_tensor_res(registered_tensor);
+  // print_tensor_res(registered_tensor);
   check_tensor_res(registered_tensor, remote_offsets_tensor);
 }

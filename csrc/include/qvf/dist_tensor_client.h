@@ -40,7 +40,7 @@ struct CollectionTask {
 };
 class DistTensorClient {
  public:
-  std::vector<Pipe> pipes;
+  std::vector<Pipe*> pipes;
   std::vector<TensorEndPoint> tensor_endpoints;
 
   // About communication
@@ -77,9 +77,9 @@ class DistTensorClient {
       if (tensor_endpoints[idx].com_endpoint.get_rank() == server_rank) {
         continue;
       }
-      pipes[tensor_endpoints[idx].com_endpoint.get_rank()] = Pipe(
+      pipes[tensor_endpoints[idx].com_endpoint.get_rank()] = new Pipe(
           context, qpFactory, tensor_endpoints[idx].com_endpoint, pipe_param);
-      pipes[tensor_endpoints[idx].com_endpoint.get_rank()].connect();
+      pipes[tensor_endpoints[idx].com_endpoint.get_rank()]->connect();
     }
   }
 
@@ -126,8 +126,8 @@ class DistTensorClient {
             tensor_buffer->getAddress(),
         "Result Tensor is not created from registered buffer");
 
-    pipes[server_rank].read(tensor_buffer, local_offsets, remote_offsets,
-                            res_tensor.size(1) * 4);
+    pipes[server_rank]->read(tensor_buffer, local_offsets, remote_offsets,
+                             res_tensor.size(1) * 4);
   }
 
   void collect_inner(CollectionTask collection_task) {

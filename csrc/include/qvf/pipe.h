@@ -58,7 +58,7 @@ class Pipe {
  private:
   ComEndPoint remote_end;
   PipeParam pipe_param;
-  infinity::memory::RegionToken* remote_buffer_token;
+  std::vector<infinity::memory::RegionToken*> remote_buffer_tokens;
   std::vector<infinity::queues::QueuePair*> qps;
   std::vector<infinity::requests::RequestToken*> requests;
   infinity::queues::SendRequestBuffer send_buffer;
@@ -95,6 +95,7 @@ class Pipe {
 
   void connect() {
     qps.resize(pipe_param.qp_num);
+    remote_buffer_tokens.resize(pipe_param.qp_num);
     requests_size =
         pipe_param.tx_depth / pipe_param.cq_mode / pipe_param.post_list_size;
     requests.resize(requests_size);
@@ -103,8 +104,10 @@ class Pipe {
     for (int qp_index = 0; qp_index < pipe_param.qp_num; qp_index++) {
       qps[qp_index] = qpFactory->connectToRemoteHost(
           remote_end.get_address().c_str(), remote_end.get_port());
+      remote_buffer_tokens[qp_index] =
+          (infinity::memory::RegionToken*)qps[qp_index]->getUserData();
     }
-    remote_buffer_token = (infinity::memory::RegionToken*)qps[0]->getUserData();
+
     for (int request_index = 0; request_index < requests.size();
          request_index++) {
       requests[request_index] = new infinity::requests::RequestToken(context);
@@ -119,7 +122,7 @@ class Pipe {
     uint64_t post_list_cnt =
         (local_offsets.size() + pipe_param.post_list_size - 1) /
         pipe_param.post_list_size;
-    // std::cout<<"Check Post_List_Count " << post_list_cnt << std::endl;
+
     // std::cout<<"Check Local_Offset_Size " << local_offsets.size() << " Check
     // Local_Offset_Size "<< remote_offsets.size()<<std::endl;
 
@@ -137,7 +140,7 @@ class Pipe {
         qps[post_index % pipe_param.qp_num]->multiRead(
             batch_read_size, local_buffer,
             &local_offsets[post_index * pipe_param.post_list_size],
-            remote_buffer_token,
+            remote_buffer_tokens[post_index % pipe_param.qp_num],
             &remote_offsets[post_index * pipe_param.post_list_size], stride,
             infinity::queues::OperationFlags(), requests[epoch_scnt],
             send_buffer);
@@ -146,14 +149,14 @@ class Pipe {
         qps[post_index % pipe_param.qp_num]->multiRead(
             batch_read_size, local_buffer,
             &local_offsets[post_index * pipe_param.post_list_size],
-            remote_buffer_token,
+            remote_buffer_tokens[post_index % pipe_param.qp_num],
             &remote_offsets[post_index * pipe_param.post_list_size], stride,
             infinity::queues::OperationFlags(), nullptr, send_buffer);
       }
       if (epoch_scnt == requests_size || post_index == post_list_cnt - 1) {
-        epoch_scnt = 0;
         context->batchPollSendCompletionQueue(pipe_param.ctx_poll_batch,
                                               epoch_scnt, wc_buffer.ptr());
+        epoch_scnt = 0;
       }
     }
   }
@@ -176,7 +179,7 @@ class Pipe {
     uint64_t post_list_cnt =
         (local_offsets_tensor.size(0) + pipe_param.post_list_size - 1) /
         pipe_param.post_list_size;
-    // std::cout<<"Check Post_List_Count " << post_list_cnt << std::endl;
+
     // std::cout<<"Check Local_Offset_Size " << local_offsets.size() << " Check
     // Local_Offset_Size "<< remote_offsets.size()<<std::endl;
 
@@ -199,7 +202,7 @@ class Pipe {
         qps[post_index % pipe_param.qp_num]->multiRead(
             batch_read_size, local_buffer,
             &local_offsets[post_index * pipe_param.post_list_size],
-            remote_buffer_token,
+            remote_buffer_tokens[post_index % pipe_param.qp_num],
             &remote_offsets[post_index * pipe_param.post_list_size], stride,
             infinity::queues::OperationFlags(), requests[epoch_scnt],
             send_buffer);
@@ -208,14 +211,14 @@ class Pipe {
         qps[post_index % pipe_param.qp_num]->multiRead(
             batch_read_size, local_buffer,
             &local_offsets[post_index * pipe_param.post_list_size],
-            remote_buffer_token,
+            remote_buffer_tokens[post_index % pipe_param.qp_num],
             &remote_offsets[post_index * pipe_param.post_list_size], stride,
             infinity::queues::OperationFlags(), nullptr, send_buffer);
       }
       if (epoch_scnt == requests_size || post_index == post_list_cnt - 1) {
-        epoch_scnt = 0;
         context->batchPollSendCompletionQueue(pipe_param.ctx_poll_batch,
                                               epoch_scnt, wc_buffer.ptr());
+        epoch_scnt = 0;
       }
     }
   }

@@ -49,6 +49,7 @@ class DistTensorServer {
   }
 
   void serve_tensor(torch::Tensor& data) {
+    std::cout << "Registering Buffer, Please Wait..." << std::endl;
     uint64_t size_in_bytes = data.numel() * 4;
     feature_buffer = new infinity::memory::Buffer(
         context, data.data_ptr<float>(), size_in_bytes);
@@ -61,14 +62,19 @@ class DistTensorServer {
   static void run(infinity::queues::QueuePairFactory* qpFactory,
                   infinity::memory::RegionToken* bufferToken,
                   int total_qp_num) {
-    std::cout << "Server starts to Receive Connections" << std::endl;
+    std::cout << "Buffer Registeration Done! Ready To Receive Connections, "
+                 "Start Your Clients Now"
+              << std::endl;
     for (int qp_index = 0; qp_index < total_qp_num; qp_index++) {
       qpFactory->acceptIncomingConnection(
           bufferToken, sizeof(infinity::memory::RegionToken));
     }
-    std::cout << "Server starts to serve data" << std::endl;
+    uint64_t seconds = 0;
+    std::cout << "Ready To Serve Data" << std::endl;
     while (1) {
-      // std::this_thread::sleep_for(std::chrono::seconds(1));  // 1s
+      std::this_thread::sleep_for(std::chrono::seconds(10));  // 10s
+      seconds += 10;
+      std::cout << "Already Served " << seconds << " s" << std::endl;
     }
   }
 };

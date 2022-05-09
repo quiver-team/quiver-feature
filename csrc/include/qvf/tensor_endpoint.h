@@ -13,9 +13,9 @@ class TensorEndPoint {
     this->range = range;
   }
 
-  TensorEndPoint(std::string ip,
+  TensorEndPoint(int rank,
+                 std::string ip,
                  int port,
-                 int rank,
                  int64_t range_start,
                  int64_t range_end) {
     this->com_endpoint = ComEndPoint(rank, ip, port);
