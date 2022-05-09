@@ -15,6 +15,10 @@ print("Before Collect, Check RegisteredTensor Shape ", registered_tensor.shape)
 local_idx = torch.arange(0, config.SAMPLE_NUM, dtype=torch.int64)
 remote_idx = torch.randint(0, config.NODE_COUNT, (config.SAMPLE_NUM, ), dtype=torch.int64)
 
+if config.TEST_TLB_OPTIMIZATION:
+    print("Using TLB Optimization")
+    remote_idx, _= torch.sort(remote_idx)
+
 local_offsets  = local_idx * config.FEATURE_DIM * config.FEATURE_TYPE_SIZE
 remote_offsets = remote_idx * config.FEATURE_DIM * config.FEATURE_TYPE_SIZE
 
