@@ -1,7 +1,7 @@
+#include <qvf/com_endpoint.h>
 #include <qvf/common.h>
 #include <qvf/dist_tensor_client.h>
 #include <qvf/pipe.h>
-#include <qvf/tensor_endpoint.h>
 
 #include <iostream>
 #include <vector>
@@ -54,13 +54,11 @@ void test_dist_tensor_client(int argc, char** argv) {
   qvf::PipeParam pipe_param(QP_NUM, CQ_MOD, CTX_POLL_BATCH, TX_DEPTH,
                             POST_LIST_SIZE);
 
-  qvf::TensorEndPoint local_tensor_end_point(
-      qvf::ComEndPoint(0, SERVER_IP, PORT_NUMBER), qvf::Range(0, NODE_COUNT));
-  qvf::TensorEndPoint remote_tensor_end_point(
-      qvf::ComEndPoint(1, SERVER_IP, PORT_NUMBER), qvf::Range(0, NODE_COUNT));
-  std::vector<qvf::TensorEndPoint> tensor_endpoints{local_tensor_end_point,
-                                                    remote_tensor_end_point};
-  qvf::DistTensorClient dist_tensor_client(0, tensor_endpoints, pipe_param);
+  qvf::ComEndPoint local_com_end_point(0, SERVER_IP, PORT_NUMBER);
+  qvf::ComEndPoint remote_com_end_point(1, SERVER_IP, PORT_NUMBER);
+  std::vector<qvf::ComEndPoint> com_endpoints{local_com_end_point,
+                                              remote_com_end_point};
+  qvf::DistTensorClient dist_tensor_client(0, com_endpoints, pipe_param);
   std::vector<int64_t> shape{SAMPLE_NUM, FEATURE_DIM};
 
   torch::Tensor registered_tensor =

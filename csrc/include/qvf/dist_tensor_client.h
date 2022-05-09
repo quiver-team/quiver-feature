@@ -41,7 +41,7 @@ struct CollectionTask {
 class DistTensorClient {
  public:
   std::vector<Pipe*> pipes;
-  std::vector<TensorEndPoint> tensor_endpoints;
+  std::vector<ComEndPoint> com_endpoints;
 
   // About communication
   PipeParam pipe_param;
@@ -60,12 +60,12 @@ class DistTensorClient {
 
  public:
   DistTensorClient(int server_rank,
-                   std::vector<TensorEndPoint> tensor_endpoints,
+                   std::vector<ComEndPoint> com_endpoints,
                    PipeParam pipe_param) {
     this->server_rank = server_rank;
-    this->tensor_endpoints = tensor_endpoints;
+    this->com_endpoints = com_endpoints;
     this->pipe_param = pipe_param;
-    server_size = tensor_endpoints.size();
+    server_size = com_endpoints.size();
     init_connection();
   }
 
@@ -74,12 +74,12 @@ class DistTensorClient {
     qpFactory = new infinity::queues::QueuePairFactory(context);
     pipes.resize(server_size);
     for (int idx = 0; idx < server_size; idx++) {
-      if (tensor_endpoints[idx].com_endpoint.get_rank() == server_rank) {
+      if (com_endpoints[idx].get_rank() == server_rank) {
         continue;
       }
-      pipes[tensor_endpoints[idx].com_endpoint.get_rank()] = new Pipe(
-          context, qpFactory, tensor_endpoints[idx].com_endpoint, pipe_param);
-      pipes[tensor_endpoints[idx].com_endpoint.get_rank()]->connect();
+      pipes[com_endpoints[idx].get_rank()] =
+          new Pipe(context, qpFactory, com_endpoints[idx], pipe_param);
+      pipes[com_endpoints[idx].get_rank()]->connect();
     }
   }
 

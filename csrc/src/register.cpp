@@ -8,6 +8,12 @@ void register_TensorEndPoint(pybind11::module& m) {
       .def(py::init<int, std::string, int, int64_t, int64_t>());
 }
 
+void register_ComEndPoint(pybind11::module& m) {
+  // define ComEndPoint
+  py::class_<qvf::ComEndPoint>(m, "ComEndPoint")
+      .def(py::init<int, std::string, int>());
+}
+
 void register_DistTensorServer(pybind11::module& m) {
   // define TensorEndPoint
   py::class_<qvf::DistTensorServer>(m, "DistTensorServer")
@@ -23,7 +29,7 @@ void register_PipeParam(pybind11::module& m) {
 
 void register_DistTensorClient(pybind11::module& m) {
   py::class_<qvf::DistTensorClient>(m, "DistTensorClient")
-      .def(py::init<int, std::vector<qvf::TensorEndPoint>, qvf::PipeParam>())
+      .def(py::init<int, std::vector<qvf::ComEndPoint>, qvf::PipeParam>())
       .def("create_registered_float32_tensor",
            &qvf::DistTensorClient::create_registered_float32_tensor,
            py::call_guard<py::gil_scoped_release>())

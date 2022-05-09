@@ -3,21 +3,21 @@ import torch
 from collections import namedtuple
 from typing import List
 import time
-Range = namedtuple("Range", ["start", "end"])
+from .common import Range
 
 class Task:
     def __init__(self, prev_order, fut):
         self.prev_order_ = prev_order
         self.fut_ = fut
         self.data_ = None
-    
+
     def wait(self):
         self.data_ = self.fut_.wait()
-    
+
     @property
     def data(self):
         return self.data_
-    
+
     @property
     def prev_order(self):
         return self.prev_order_
@@ -33,12 +33,12 @@ class Singleton(object):
         return self._instance[self._cls]
 
 def collect(nodes):
-    dist_feature = DistFeature()
+    dist_feature = DistTensor()
     return dist_feature.collect(nodes)
 
 
 @Singleton
-class DistFeature(object):
+class DistTensor(object):
 
     def __init__(self):
         pass
@@ -55,11 +55,11 @@ class DistFeature(object):
         self.world_size = world_size
         self.local_size = local_size
         self.debug_params = debug_params
-        
+
         rpc.init_rpc(f"worker{rank}", rank=self.rank, world_size= world_size, rpc_backend_options=rpc_option)
 
     def collect(self, nodes):
-        
+
         # TODO Just For Debugging
         if nodes.is_cuda:
             torch.cuda.set_device(self.local_rank)
@@ -69,7 +69,7 @@ class DistFeature(object):
         if self.debug_params.get("cpu_collect_gpu_send", 0):
             data = data.to(self.local_rank)
         return data
-    
+
     def collect_cached_data(self, nodes):
          # TODO Just For Debugging
         if nodes.is_cuda:
@@ -100,7 +100,7 @@ class DistFeature(object):
                     part_orders = torch.masked_select(input_orders, request_nodes_mask)
                     fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
                     task_list.append(Task(part_orders, fut))
-        
+
         end_time = time.time()
         print(f"{self.rank}:\tRequest Distpatch Time = {end_time - start_time}")
 
@@ -112,7 +112,7 @@ class DistFeature(object):
             feature = torch.empty(nodes.shape[0], self.shard_tensor.shape[1])
 
         end_time = time.time()
-        print(f"{self.rank}:\tMemory Allocation Time = {end_time - start_time}")  
+        print(f"{self.rank}:\tMemory Allocation Time = {end_time - start_time}")
 
         start_time = time.time()
         # Load Cached Data
@@ -133,12 +133,11 @@ class DistFeature(object):
             feature[local_part_orders] = self.collect(local_request_nodes)
 
         end_time = time.time()
-        print(f"{self.rank}:\tLocal Collect Time = {end_time - start_time}")  
+        print(f"{self.rank}:\tLocal Collect Time = {end_time - start_time}")
 
         start = time.time()
         for task in task_list:
             task.wait()
-            feature[task.prev_order] = task.data    
+            feature[task.prev_order] = task.data
         print(f"{self.rank}:\tNetwork Collect Time = {time.time() - start}\tLocal Hit Rate = {1 - remote_collect/nodes.shape[0]}")
         return feature
-    
