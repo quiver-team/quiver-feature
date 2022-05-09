@@ -67,7 +67,7 @@ class DistTensor:
 
 
         # Collect Remote Data
-        all_remote_nodes_mask = nodes >= self.tensor_endpoints[self.server_rank].range.end
+        all_remote_nodes_mask = torch.logical_not(torch.logical_and(nodes >= self.tensor_endpoints[self.server_rank].range.start, nodes < self.tensor_endpoints[self.server_rank].range.end))
         all_remote_nodes = torch.masked_select(nodes, all_remote_nodes_mask)
         all_remote_orders = torch.masked_select(input_orders, all_remote_nodes_mask)
 

@@ -4,8 +4,6 @@ import quiver
 from typing import List
 from .common import Range, TensorEndPoint
 
-
-
 class DistTensor:
     def __init__(self, device_rank, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, shard_tensor: quiver.shard_tensor.ShardTensor, cached_range = Range(start=0, end=0), order_transform=None)-> None:
         # About DistTensorClient
@@ -67,7 +65,7 @@ class DistTensor:
 
 
         # Collect Remote Data
-        all_remote_nodes_mask = nodes >= self.tensor_endpoints[self.server_rank].range.end
+        all_remote_nodes_mask = torch.logical_not(torch.logical_and(nodes >= self.tensor_endpoints[self.server_rank].range.start, nodes < self.tensor_endpoints[self.server_rank].range.end))
         all_remote_nodes = torch.masked_select(nodes, all_remote_nodes_mask)
         all_remote_orders = torch.masked_select(input_orders, all_remote_nodes_mask)
 

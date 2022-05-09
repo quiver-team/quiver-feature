@@ -6,8 +6,9 @@ import qvf
 import quiver_feature
 import config
 from quiver.shard_tensor import ShardTensorConfig, ShardTensor
-from quiver_feature import DistTensorPGAS, TensorEndPoint, Range
-
+from quiver_feature import TensorEndPoint, Range
+#from tmp import DistTensor as DistTensorPGAS
+from quiver_feature import DistTensorPGAS
 NUM_ELEMENT = 1000000
 FEATURE_DIM = 600
 SAMPLE_SIZE = 80000
@@ -22,7 +23,7 @@ PORT_LIST = [3344, 3344]
 
 # DONT CHANGE THESE 2 PARAMS
 WORLD_SIZE = 2
-LOCAL_SERVER_RANK = 0
+LOCAL_SERVER_RANK = 1
 
 torch.cuda.set_device(DEVICE_RANK)
 
