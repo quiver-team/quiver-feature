@@ -40,7 +40,7 @@ class DistHelper:
                     self.tcp_store.wait(keys, timedelta(seconds=1))
                     break
                 except:
-                    print("Wait For Another 1s", self.tcp_store.num_keys())
+                    print("Wait For Another 1s")
 
 
         return tensor_endpoints
@@ -54,19 +54,19 @@ class DistHelper:
                 self.tcp_store.wait(keys, timedelta(seconds=1))
                 break
             except:
-                print("Wait For Another 1s", self.tcp_store.num_keys())
+                print("Wait For Another 1s")
 
 
         self.tcp_store.set(f"worker{self.my_server_rank}_sync_end_{self.sync_point}", f"SYNC1")
 
         keys = [f"worker{rank}_sync_end_{self.sync_point}" for rank in range(self.server_world_size)]
         if self.my_server_rank == 0:
-            while True:
+           while True:
                 try:
                     self.tcp_store.wait(keys, timedelta(seconds=1))
                     break
                 except:
-                    print("Wait For Another 1s", self.tcp_store.num_keys())
+                    print("Wait For Another 1s")
 
 
             # TODO Delete Keys
@@ -86,9 +86,7 @@ class DistHelper:
                 self.tcp_store.wait(keys, timedelta(seconds=1))
                 break
             except:
-                print("Wait For Another 1s", self.tcp_store.num_keys())
-
-        print(self.tcp_store.get(keys[0]))
+                print("Wait For Another 1s")
 
         self.tcp_store.set(f"worker{self.my_server_rank}_sync_end_{self.sync_point}", f"SYNC1")
 
@@ -99,8 +97,7 @@ class DistHelper:
                     self.tcp_store.wait(keys, timedelta(seconds=1))
                     break
                 except:
-                    print("Wait For Another 1s", self.tcp_store.num_keys())
-
+                    print("Wait For Another 1s")
             # TODO Delete Keys
             #self.tcp_store.deleteKey(f"worker{self.my_server_rank}_sync_start_{self.sync_point}")
             #self.tcp_store.deleteKey(f"worker{self.my_server_rank}_sync_end_{self.sync_point}")
