@@ -26,9 +26,8 @@ start_time = time.time()
 dist_tensor_client.sync_read(1, registered_tensor, local_offsets, remote_offsets)
 consumed = time.time() - start_time
 
+print("Begin To Check Result...")
 registered_tensor = registered_tensor.to('cpu')
-
-
 for row in range(config.SAMPLE_NUM):
     if not all(registered_tensor[row] == remote_idx[row]):
         print(f"Result Check Failed At {row}, Expected {remote_idx[row]}, But got {registered_tensor[row]}, Local Offsets {local_offsets[row]}, Remote Offsets {remote_offsets[row]}")
