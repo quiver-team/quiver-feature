@@ -39,13 +39,14 @@ class DistTensorServer {
     qpFactory->bindToPort(port);
   }
 
+  void join() { server_thread.join(); }
+
   void serve(void* data, int64_t size_in_bytes) {
     feature_buffer =
         new infinity::memory::Buffer(context, data, (uint64_t)size_in_bytes);
     bufferToken = feature_buffer->createRegionToken();
     server_thread =
         std::thread(run, qpFactory, bufferToken, qp_per_pipe * world_size);
-    server_thread.join();
   }
 
   void serve_tensor(torch::Tensor& data) {
@@ -56,7 +57,6 @@ class DistTensorServer {
     bufferToken = feature_buffer->createRegionToken();
     server_thread =
         std::thread(run, qpFactory, bufferToken, qp_per_pipe * world_size);
-    server_thread.join();
   }
 
   static void run(infinity::queues::QueuePairFactory* qpFactory,

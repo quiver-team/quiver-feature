@@ -19,6 +19,8 @@ void register_DistTensorServer(pybind11::module& m) {
   py::class_<qvf::DistTensorServer>(m, "DistTensorServer")
       .def(py::init<int, int, int>())
       .def("serve_tensor", &qvf::DistTensorServer::serve_tensor,
+           py::call_guard<py::gil_scoped_release>())
+      .def("join", &qvf::DistTensorServer::join,
            py::call_guard<py::gil_scoped_release>());
 }
 
