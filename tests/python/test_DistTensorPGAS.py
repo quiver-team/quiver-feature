@@ -3,7 +3,6 @@ import numpy as np
 import time
 import threading
 import qvf
-import quiver_feature
 import config
 from quiver.shard_tensor import ShardTensorConfig, ShardTensor
 from quiver_feature import TensorEndPoint, Range
@@ -23,7 +22,7 @@ PORT_LIST = [3344, 3344]
 
 # DONT CHANGE THESE 2 PARAMS
 WORLD_SIZE = 2
-LOCAL_SERVER_RANK = 1
+LOCAL_SERVER_RANK = 0
 
 torch.cuda.set_device(DEVICE_RANK)
 

@@ -98,6 +98,18 @@ class DistTensorClient {
                             {tensor_shape[0], tensor_shape[1]}, tensor_option);
   }
 
+  void register_float32_tensor(torch::Tensor& float_tensor) {
+    QUIVER_FEATURE_ASSERT(
+        float_tensor.dim() == 2,
+        "Only support 2-dimensional tensor, But got %d-dimensional tensor\n",
+        float_tensor.dim());
+    uint64_t size_in_bytes = 4 * float_tensor.numel();
+
+    tensor_buffer = new infinity::memory::Buffer(
+        context, float_tensor.data_ptr<float>(), size_in_bytes);
+    tensor_token = tensor_buffer->createRegionToken();
+  }
+
   torch::Tensor create_registered_float32_tensor_cuda(
       std::vector<int64_t> tensor_shape,
       int device) {

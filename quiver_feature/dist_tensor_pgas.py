@@ -14,7 +14,8 @@ class DistTensor:
         self.buffer_tensor_shape = buffer_tensor_shape
         com_endpoints = [qvf.ComEndPoint(item.server_rank, item.ip, item.port) for item in tensor_endpoints]
         self.dist_tensor_client = qvf.DistTensorClient(server_rank, com_endpoints, pipe_param)
-        self.registered_tensor = self.dist_tensor_client.create_registered_float32_tensor(buffer_tensor_shape)
+        self.registered_tensor = torch.zeros(buffer_tensor_shape).pin_memory()
+        self.dist_tensor_client.register_float32_tensor(self.registered_tensor)
 
         # About ShardTensor
         self.shard_tensor = shard_tensor
