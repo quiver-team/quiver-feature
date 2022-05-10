@@ -5,7 +5,7 @@ from typing import List
 from .common import Range, TensorEndPoint
 
 class DistTensor:
-    def __init__(self, device_rank, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, shard_tensor: quiver.shard_tensor.ShardTensor, cached_range = Range(start=0, end=0), order_transform=None)-> None:
+    def __init__(self, device_rank, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, shard_tensor: quiver.shard_tensor.ShardTensor, cached_range: Range= Range(start=0, end=0), order_transform:torch.Tensor=None)-> None:
         # About DistTensorClient
         self.server_rank = server_rank
         self.world_size = len(tensor_endpoints)
@@ -66,12 +66,13 @@ class DistTensor:
 
 
         # Collect Remote Data
-        all_remote_nodes_mask = torch.logical_not(torch.logical_and(nodes >= self.tensor_endpoints[self.server_rank].range.start, nodes < self.tensor_endpoints[self.server_rank].range.end))
+        all_remote_nodes_mask = torch.logical_not(torch.logical_and(torch.logical_and(nodes >= self.tensor_endpoints[self.server_rank].range.start, nodes < self.tensor_endpoints[self.server_rank].range.end), nodes >= self.cached_range.end))
         all_remote_nodes = torch.masked_select(nodes, all_remote_nodes_mask)
         all_remote_orders = torch.masked_select(input_orders, all_remote_nodes_mask)
 
         assert all_remote_nodes.shape[0] < self.registered_tensor.shape[0], "Collected Data Exceeds Buffer Size"
 
+        print(f"Collecting {all_remote_nodes.shape[0] / nodes.shape[0]} data from remote")
         for server_rank in range(self.world_size):
 
             range_item = self.tensor_endpoints[server_rank].range
