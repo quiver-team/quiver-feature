@@ -74,7 +74,6 @@ class DistTensorServer {
     while (1) {
       std::this_thread::sleep_for(std::chrono::seconds(10));  // 10s
       seconds += 10;
-      std::cout << "Already Served " << seconds << " s" << std::endl;
     }
   }
 };

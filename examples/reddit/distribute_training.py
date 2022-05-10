@@ -71,59 +71,66 @@ class SAGE(torch.nn.Module):
         return x_all
 
 
-def run(rank, world_size, data_split, edge_index, x, quiver_sampler, y, num_features, num_classes, server_rank, cached_range, tensor_endpoints):
+def run(rank, world_size, data_split, edge_index, x, quiver_sampler, y, num_features, num_classes, server_rank, device_per_node, cached_range, tensor_endpoints):
     os.environ['MASTER_ADDR'] = config.MASTER_IP
     os.environ['MASTER_PORT'] = "11421"
-    dist.init_process_group('nccl', rank=rank, world_size=world_size)
+    device_rank = rank
+    process_rank = server_rank * device_per_node + rank
+    print(f"Local Rank: {process_rank}, World_Size: {world_size}")
+    dist.init_process_group('nccl', rank=process_rank, world_size=world_size)
 
-    torch.torch.cuda.set_device(rank)
+    torch.torch.cuda.set_device(device_rank)
 
     train_mask, val_mask, test_mask = data_split
     train_idx = train_mask.nonzero(as_tuple=False).view(-1)
-    train_idx = train_idx.split(train_idx.size(0) // world_size)[rank]
+    train_idx = train_idx.split(train_idx.size(0) // world_size)[server_rank * device_per_node + rank]
 
     train_loader = torch.utils.data.DataLoader(train_idx, batch_size=config.BATCH_SIZE, shuffle=True, drop_last=True)
 
     pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
+    print(f"Begin To Create DistTensorPGAS In ServerRank = {server_rank}")
+    buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, x.shape[1]]
 
-    dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, x.shape[1]], x, cached_range)
+    dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, buffer_shape, x, cached_range)
 
-    if rank == 0:
+    if process_rank == 0:
         subgraph_loader = NeighborSampler(edge_index, node_idx=None,
                                           sizes=[-1], batch_size=2048,
-                                          shuffle=False, num_workers=6)
+                                          shuffle=False, num_workers=0)
 
     torch.manual_seed(12345)
-    model = SAGE(num_features, 256, num_classes).to(rank)
-    model = DistributedDataParallel(model, device_ids=[rank])
+    model = SAGE(num_features, 256, num_classes).to(device_rank)
+    model = DistributedDataParallel(model, device_ids=[device_rank])
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
     # Simulate cases those data can not be fully stored by GPU memory
-    y = y.to(rank)
+    y = y.to(device_rank)
 
+    print("Begin To Train")
     for epoch in range(1, 21):
         model.train()
         epoch_start = time.time()
         for seeds in train_loader:
             n_id, batch_size, adjs = quiver_sampler.sample(seeds)
-            adjs = [adj.to(rank) for adj in adjs]
-
+            adjs = [adj.to(device_rank) for adj in adjs]
             optimizer.zero_grad()
-            out = model(dist_tensor[n_id].to(rank), adjs)
+            out = model(dist_tensor[n_id].to(device_rank), adjs)
             loss = F.nll_loss(out, y[n_id[:batch_size]])
             loss.backward()
             optimizer.step()
+            print("seeds")
 
+        print("Before Barrier")
         dist.barrier()
 
-        if rank == 0:
+        if process_rank == 0:
             print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}, Epoch Time: {time.time() - epoch_start}')
 
-        if rank == 0 and epoch % 5 == 0:  # We evaluate on a single GPU for now
+        if process_rank == 0 and epoch % 5 == 0:  # We evaluate on a single GPU for now
             model.eval()
             with torch.no_grad():
-                out = model.module.inference(dist_tensor, rank, subgraph_loader)
+                out = model.module.inference(dist_tensor, device_rank, subgraph_loader)
             res = out.argmax(dim=-1) == y
             acc1 = int(res[train_mask].sum()) / int(train_mask.sum())
             acc2 = int(res[val_mask].sum()) / int(val_mask.sum())
@@ -181,7 +188,7 @@ if __name__ == '__main__':
     tensor_endpoints = dist_helper.exchange_tensor_endpoints_info(range_list[args.server_rank])
     print(f"Starting Server With: {tensor_endpoints}")
     # Start Feature Server
-    server = threading.Thread(target=server_thread, args=(args.server_world_size, local_tensor, dist_helper))
+    server = threading.Thread(target=server_thread, args=(args.server_world_size * args.device_per_node, local_tensor, dist_helper))
     server.daemon = True
     server.start()
 
@@ -201,7 +208,8 @@ if __name__ == '__main__':
     print(f"Begin To Spawn Training Processes")
     mp.spawn(
         run,
-        args=(args.device_per_node * args.server_world_size, data_split, data.edge_index, quiver_feature, quiver_sampler, data.y, dataset.num_features, dataset.num_classes, args.server_rank, cached_range, tensor_endpoints),
+        args=(args.device_per_node * args.server_world_size, data_split, data.edge_index, quiver_feature, quiver_sampler, data.y, dataset.num_features, dataset.num_classes, args.server_rank, args.device_per_node, cached_range, tensor_endpoints),
         nprocs=args.device_per_node,
         join=True
     )
+    dist_helper.sync()
