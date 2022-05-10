@@ -78,9 +78,9 @@ if __name__ == "__main__":
     host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEATURE_DIM)
     tensor = torch.from_numpy(host_tensor).type(torch.float32)
 
-    # Build quiver_feature
-    quiver_feature = quiver.Feature(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="device_replicate")
-    quiver_feature.from_cpu_tensor(tensor)
+    # Build quiverFeature
+    quiverFeature = quiver.Feature(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="device_replicate")
+    quiverFeature.from_cpu_tensor(tensor)
 
     # Decide Range Information
     range_list = []
@@ -109,6 +109,6 @@ if __name__ == "__main__":
     whole_tensor = torch.cat([tensor[:cached_range.end, ]] + [tensor[cached_range.end:, ]] * SERVER_WORLD_SIZE)
 
 
-    mp.spawn(feature_process, nprocs=args.device_per_node, args=(LOCAL_SERVER_RANK, tensor_endpoints_list, quiver_feature, cached_range, whole_tensor, SERVER_WORLD_SIZE, NUM_ELEMENT, SAMPLE_SIZE, FEATURE_DIM), join=True)
+    mp.spawn(feature_process, nprocs=args.device_per_node, args=(LOCAL_SERVER_RANK, tensor_endpoints_list, quiverFeature, cached_range, whole_tensor, SERVER_WORLD_SIZE, NUM_ELEMENT, SAMPLE_SIZE, FEATURE_DIM), join=True)
 
     dist_helper.sync_all()
