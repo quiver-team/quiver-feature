@@ -1,8 +1,6 @@
-import torch.distributed.rpc as rpc
 import torch
-from collections import namedtuple
+import torch.distributed.rpc as rpc
 from typing import List
-import time
 from .common import Range
 
 class Task:
@@ -32,13 +30,14 @@ class Singleton(object):
             self._instance[self._cls].init(*args, **kwargs)
         return self._instance[self._cls]
 
+
 def collect(nodes):
-    dist_feature = DistTensor()
-    return dist_feature.collect(nodes)
+    dist_tensor = DistTensorRPC()
+    return dist_tensor.collect(nodes)
 
 
 @Singleton
-class DistTensor(object):
+class DistTensorRPC(object):
 
     def __init__(self):
         pass
@@ -66,8 +65,7 @@ class DistTensor(object):
         nodes -= self.range_list[self.rank].start
         nodes += self.cached_range.end
         data = self.shard_tensor[nodes]
-        if self.debug_params.get("cpu_collect_gpu_send", 0):
-            data = data.to(self.local_rank)
+
         return data
 
     def collect_cached_data(self, nodes):
@@ -75,15 +73,11 @@ class DistTensor(object):
         if nodes.is_cuda:
             torch.cuda.set_device(self.local_rank)
         data = self.shard_tensor[nodes]
-        if self.debug_params.get("cpu_collect_gpu_send", 0):
-            data = data.to(self.local_rank)
+
         return data
-
-
 
     def __getitem__(self, nodes):
 
-        start_time = time.time()
         task_list: List[Task] = []
         if self.order_transform is not None:
             nodes = self.order_transform[nodes]
@@ -101,27 +95,15 @@ class DistTensor(object):
                     fut = rpc.rpc_async(f"worker{worker_id}", collect, args=(request_nodes, ))
                     task_list.append(Task(part_orders, fut))
 
-        end_time = time.time()
-        print(f"{self.rank}:\tRequest Distpatch Time = {end_time - start_time}")
+        feature = torch.zeros(nodes.shape[0], self.shard_tensor.shape[1], device = f"cuda:{self.local_rank}")
 
-        start_time = time.time()
-        if nodes.is_cuda or self.debug_params.get("cpu_collect_gpu_send", 0):
-            feature = torch.zeros(nodes.shape[0], self.shard_tensor.shape[1], device = nodes.device)
-        else:
-            # TODO: Just For Debugging
-            feature = torch.empty(nodes.shape[0], self.shard_tensor.shape[1])
-
-        end_time = time.time()
-        print(f"{self.rank}:\tMemory Allocation Time = {end_time - start_time}")
-
-        start_time = time.time()
         # Load Cached Data
         if self.cached_range.end > 0:
             request_nodes_mask = (nodes >= self.cached_range.start) & (nodes < self.cached_range.end)
             cache_request_nodes = torch.masked_select(nodes, request_nodes_mask)
             cache_part_orders = torch.masked_select(input_orders, request_nodes_mask)
             if cache_request_nodes.shape[0] > 0:
-                feature[cache_part_orders] = self.collect_cached_data(cache_request_nodes)
+                feature[cache_part_orders] = self.collect_cached_data(cache_request_nodes).to(self.local_rank)
 
 
         # Load local data
@@ -130,14 +112,9 @@ class DistTensor(object):
         local_request_nodes = torch.masked_select(nodes, request_nodes_mask)
         local_part_orders = torch.masked_select(input_orders, request_nodes_mask)
         if local_request_nodes.shape[0] > 0:
-            feature[local_part_orders] = self.collect(local_request_nodes)
+            feature[local_part_orders] = self.collect(local_request_nodes).to(self.local_rank)
 
-        end_time = time.time()
-        print(f"{self.rank}:\tLocal Collect Time = {end_time - start_time}")
-
-        start = time.time()
         for task in task_list:
             task.wait()
-            feature[task.prev_order] = task.data
-        print(f"{self.rank}:\tNetwork Collect Time = {time.time() - start}\tLocal Hit Rate = {1 - remote_collect/nodes.shape[0]}")
+            feature[task.prev_order] = task.data.to(self.local_rank)
         return feature
