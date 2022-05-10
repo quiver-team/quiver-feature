@@ -25,6 +25,15 @@ class DistTensor:
         if order_transform is not None:
             self.order_transform = order_transform.to(device_rank)
 
+    def size(self, dim):
+        assert dim < 2, "DistTensorPGAS is 2-dimensional"
+        if dim == 1:
+            return self.buffer_tensor_shape[1]
+        if dim == 0:
+            all_ends = [item.range.end for item in self.tensor_endpoints]
+            all_ends.sort()
+            return all_ends[-1]
+
     def collect(self, nodes):
         nodes -= self.tensor_endpoints[self.server_rank].range.start
         nodes += self.cached_range.end
@@ -41,6 +50,7 @@ class DistTensor:
 
     def __getitem__(self, nodes):
 
+        nodes = nodes.cuda()
         if self.order_transform is not None:
             nodes = self.order_transform[nodes]
 
