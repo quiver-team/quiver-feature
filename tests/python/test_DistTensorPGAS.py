@@ -10,18 +10,18 @@ from quiver_feature import TensorEndPoint, Range
 from quiver_feature import DistHelper
 #from tmp import DistTensor as DistTensorPGAS
 from quiver_feature import DistTensorPGAS
-NUM_ELEMENT = 1000000
-FEATURE_DIM = 600
-SAMPLE_SIZE = 80000
-DEVICE_RANK = 0
-CACHE_RATIO = 0.0
+
 
 START_SERVER = True
 MASTER_IP = "155.198.152.17"
 HLPER_PORT = 5678
+DEVICE_RANK = 0
 
-# DONT CHANGE THESE 2 PARAMS
 WORLD_SIZE = 2
+NUM_ELEMENT = 1000000
+FEATURE_DIM = 600
+SAMPLE_SIZE = 80000
+CACHE_RATIO = 0.0
 LOCAL_SERVER_RANK = 0
 
 
