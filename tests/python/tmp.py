@@ -49,28 +49,39 @@ class DistTensor:
             nodes = self.order_transform[nodes]
 
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
+
         feature = torch.empty(nodes.shape[0], self.shard_tensor.shape[1], device = nodes.device)
+
+        cache_nodes_mask = None
+        local_nodes_mask = None
+
 
         # Load cache data
         if self.cached_range.end > 0:
-            request_nodes_mask = (nodes >= self.cached_range.start) & (nodes < self.cached_range.end)
-            cache_request_nodes = torch.masked_select(nodes, request_nodes_mask)
-            cache_part_orders = torch.masked_select(input_orders, request_nodes_mask)
+            cache_nodes_mask = (nodes >= self.cached_range.start) & (nodes < self.cached_range.end)
+            cache_request_nodes = torch.masked_select(nodes, cache_nodes_mask)
+            cache_part_orders = torch.masked_select(input_orders, cache_nodes_mask)
             if cache_request_nodes.shape[0] > 0:
                 feature[cache_part_orders] = self.collect_cached_data(cache_request_nodes)
 
 
+
+
         # Load local data
         range_item = self.tensor_endpoints[self.server_rank].range
-        request_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
-        local_request_nodes = torch.masked_select(nodes, request_nodes_mask)
-        local_part_orders = torch.masked_select(input_orders, request_nodes_mask)
+        local_nodes_mask = (nodes >= range_item.start) & (nodes < range_item.end)
+        local_request_nodes = torch.masked_select(nodes, local_nodes_mask)
+        local_part_orders = torch.masked_select(input_orders, local_nodes_mask)
         if local_request_nodes.shape[0] > 0:
             feature[local_part_orders] = self.collect(local_request_nodes)
 
 
         # Collect Remote Data
-        all_remote_nodes_mask = torch.logical_not(torch.logical_and(torch.logical_and(nodes >= self.tensor_endpoints[self.server_rank].range.start, nodes < self.tensor_endpoints[self.server_rank].range.end), nodes >= self.cached_range.start))
+        if cache_nodes_mask is None:
+            all_remote_nodes_mask = torch.logical_not(local_nodes_mask)
+        else:
+            all_remote_nodes_mask = torch.logical_not(torch.logical_or(local_nodes_mask, cache_nodes_mask))
+
         all_remote_nodes = torch.masked_select(nodes, all_remote_nodes_mask)
         all_remote_orders = torch.masked_select(input_orders, all_remote_nodes_mask)
 
