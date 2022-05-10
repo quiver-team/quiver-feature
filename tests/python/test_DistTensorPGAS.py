@@ -1,3 +1,4 @@
+import argparse
 import torch
 import numpy as np
 import time
@@ -12,17 +13,28 @@ from quiver_feature import DistHelper
 from quiver_feature import DistTensorPGAS
 
 
-START_SERVER = True
+parser = argparse.ArgumentParser(description='')
+parser.add_argument('-rank', type=int, help='rank')
+parser.add_argument('-device', type=int, default=0, help="device idx")
+parser.add_argument('-world_size', type=int, default = 2, help="world size")
+parser.add_argument('-start_server', type=int, default=0, help='whether to start server')
+parser.add_argument("-cache_ratio", type=float, default=0.0, help ="how much data you want to cache")
+
+args = parser.parse_args()
+
+
 MASTER_IP = "155.198.152.17"
 HLPER_PORT = 5678
-DEVICE_RANK = 0
 
-WORLD_SIZE = 2
 NUM_ELEMENT = 1000000
 FEATURE_DIM = 600
 SAMPLE_SIZE = 80000
-CACHE_RATIO = 0.1
-LOCAL_SERVER_RANK = 0
+
+DEVICE_RANK = args.device
+WORLD_SIZE = args.world_size
+START_SERVER = args.start_server
+CACHE_RATIO = args.cache_ratio
+LOCAL_SERVER_RANK = args.rank
 
 
 torch.cuda.set_device(DEVICE_RANK)
