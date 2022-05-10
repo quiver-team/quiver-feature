@@ -69,6 +69,9 @@ if START_SERVER:
     x.daemon = True
     x.start()
 
+else:
+    dist_helper.sync_start()
+
 dist_helper.sync_end()
 
 pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
