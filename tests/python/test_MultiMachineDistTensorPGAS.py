@@ -44,12 +44,21 @@ def feature_process(rank, server_rank, tensor_endpoints, singe_machine_feature, 
 
     # warm up
     data = dist_tensor[indices_device]
+    torch.cuda.synchronize()
     TEST_COUNT = 1000
     start = time.time()
-    for _ in range(TEST_COUNT):
-        data = dist_tensor[indices_device]
+    consumed = 0
+    for i in range(TEST_COUNT):
+        host_indice = np.random.randint(0, high= SERVER_WORLD_SIZE * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
+        indices = torch.from_numpy(host_indice).type(torch.long)
+        indices, _ = torch.sort(indices)
+        indices_device = indices.to(rank)
+        torch.cuda.synchronize()
 
-    consumed = time.time() - start
+        start = time.time()
+        data = dist_tensor[indices_device]
+        torch.cuda.synchronize()
+        consumed += time.time() - start
 
     data = data.cpu()
     data_gt = whole_tensor[indices]
