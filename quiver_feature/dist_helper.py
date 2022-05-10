@@ -40,7 +40,7 @@ class DistHelper:
                     self.tcp_store.wait(keys, timedelta(seconds=1))
                     break
                 except:
-                    print("Wait For Another 1s")
+                    pass
 
 
         return tensor_endpoints
@@ -54,7 +54,7 @@ class DistHelper:
                 self.tcp_store.wait(keys, timedelta(seconds=1))
                 break
             except:
-                print("Wait For Another 1s")
+                pass
 
 
         self.tcp_store.set(f"worker{self.my_server_rank}_sync_end_{self.sync_point}", f"SYNC1")
@@ -66,7 +66,7 @@ class DistHelper:
                     self.tcp_store.wait(keys, timedelta(seconds=1))
                     break
                 except:
-                    print("Wait For Another 1s")
+                    pass
 
 
             # TODO Delete Keys
@@ -86,7 +86,7 @@ class DistHelper:
                 self.tcp_store.wait(keys, timedelta(seconds=1))
                 break
             except:
-                print("Wait For Another 1s")
+                pass
 
         self.tcp_store.set(f"worker{self.my_server_rank}_sync_end_{self.sync_point}", f"SYNC1")
 
@@ -97,7 +97,7 @@ class DistHelper:
                     self.tcp_store.wait(keys, timedelta(seconds=1))
                     break
                 except:
-                    print("Wait For Another 1s")
+                    pass
             # TODO Delete Keys
             #self.tcp_store.deleteKey(f"worker{self.my_server_rank}_sync_start_{self.sync_point}")
             #self.tcp_store.deleteKey(f"worker{self.my_server_rank}_sync_end_{self.sync_point}")
