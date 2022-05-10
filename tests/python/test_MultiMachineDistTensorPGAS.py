@@ -33,6 +33,7 @@ args = parser.parse_args()
 
 
 def feature_process(rank, server_rank, tensor_endpoints, singe_machine_feature, cached_range, whole_tensor, SERVER_WORLD_SIZE, NUM_ELEMENT, SAMPLE_SIZE, FEATURE_DIM):
+
     torch.cuda.set_device(rank)
     host_indice = np.random.randint(0, high= SERVER_WORLD_SIZE * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
     indices = torch.from_numpy(host_indice).type(torch.long)
@@ -40,8 +41,14 @@ def feature_process(rank, server_rank, tensor_endpoints, singe_machine_feature, 
 
     pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
     dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], singe_machine_feature, cached_range)
-    start = time.time()
+
+    # warm up
     data = dist_tensor[indices_device]
+    TEST_COUNT = 1000
+    start = time.time()
+    for _ in range(TEST_COUNT):
+        data = dist_tensor[indices_device]
+
     consumed = time.time() - start
 
     data = data.cpu()
@@ -49,7 +56,7 @@ def feature_process(rank, server_rank, tensor_endpoints, singe_machine_feature, 
 
     assert torch.equal(data, data_gt), "Result Check Failed!"
 
-    print(f"Result Check Successed! Throughput = {data.numel() * 4 / 1024 / 1024 / consumed} MB/s")
+    print(f"Result Check Successed! Throughput = {data.numel() * 4 * TEST_COUNT/ 1024 / 1024 / consumed} MB/s")
 
 
 
@@ -87,7 +94,7 @@ if __name__ == "__main__":
 
     # Start server thread
     def server_thread(dist_helper):
-        dist_tensor_server = qvf.DistTensorServer(config.PORT_NUMBER, SERVER_WORLD_SIZE, config.QP_NUM)
+        dist_tensor_server = qvf.DistTensorServer(config.PORT_NUMBER, SERVER_WORLD_SIZE * args.device_per_node, config.QP_NUM)
         dist_tensor_server.serve_tensor(tensor)
         dist_helper.sync_start()
         dist_tensor_server.join()
