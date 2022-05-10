@@ -20,7 +20,7 @@ MASTER_IP = "155.198.152.17"
 HLPER_PORT = 5678
 
 # DONT CHANGE THESE 2 PARAMS
-WORLD_SIZE = 1
+WORLD_SIZE = 2
 LOCAL_SERVER_RANK = 0
 
 
@@ -53,7 +53,7 @@ tensor_endpoints_list = [
 '''
 
 dist_helper = DistHelper(MASTER_IP, HLPER_PORT, WORLD_SIZE, LOCAL_SERVER_RANK)
-tensor_endpoints_list = dist_helper.exchange_tensor_endpoints_info(range_list[0])
+tensor_endpoints_list = dist_helper.exchange_tensor_endpoints_info(range_list[LOCAL_SERVER_RANK])
 
 print(f"All TensorEndPoints {tensor_endpoints_list}")
 
