@@ -9,11 +9,10 @@ import qvf
 import config
 import quiver
 import torch.multiprocessing as mp
-from quiver.shard_tensor import ShardTensorConfig, ShardTensor
 from quiver_feature import TensorEndPoint, Range
 from quiver_feature import DistHelper
 #from tmp import DistTensor as DistTensorPGAS
-from quiver_feature import DistTensorPGAS
+from quiver_feature import DistTensorPGAS, LocalTensorPGAS
 
 MASTER_IP = "155.198.152.17"
 HLPER_PORT = 5678
@@ -32,7 +31,7 @@ parser.add_argument("-cache_ratio", type=float, default=0.0, help ="how much dat
 args = parser.parse_args()
 
 
-def feature_process(rank, server_rank, tensor_endpoints, singe_machine_feature, cached_range, whole_tensor, SERVER_WORLD_SIZE, NUM_ELEMENT, SAMPLE_SIZE, FEATURE_DIM):
+def feature_process(rank, server_rank, tensor_endpoints, local_tensor_pgas, cached_range, whole_tensor, SERVER_WORLD_SIZE, NUM_ELEMENT, SAMPLE_SIZE, FEATURE_DIM):
 
     torch.cuda.set_device(rank)
     host_indice = np.random.randint(0, high= SERVER_WORLD_SIZE * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
@@ -40,12 +39,12 @@ def feature_process(rank, server_rank, tensor_endpoints, singe_machine_feature, 
     indices_device = indices.to(rank)
 
     pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
-    dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], singe_machine_feature, cached_range)
+    dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], local_tensor_pgas, cached_range)
 
     # warm up
     data = dist_tensor[indices_device]
     torch.cuda.synchronize()
-    TEST_COUNT = 10000
+    TEST_COUNT = 1000
     start = time.time()
     consumed = 0
     for i in range(TEST_COUNT):
@@ -88,9 +87,9 @@ if __name__ == "__main__":
     host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEATURE_DIM)
     tensor = torch.from_numpy(host_tensor).type(torch.float32)
 
-    # Build quiverFeature
-    quiverFeature = quiver.Feature(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="device_replicate")
-    quiverFeature.from_cpu_tensor(tensor)
+    # Build local_tensor_pgas
+    local_tensor_pgas = LocalTensorPGAS(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="device_replicate")
+    local_tensor_pgas.from_cpu_tensor(tensor)
 
     # Decide Range Information
     range_list = []
@@ -119,6 +118,6 @@ if __name__ == "__main__":
     whole_tensor = torch.cat([tensor[:cached_range.end, ]] + [tensor[cached_range.end:, ]] * SERVER_WORLD_SIZE)
 
 
-    mp.spawn(feature_process, nprocs=args.device_per_node, args=(LOCAL_SERVER_RANK, tensor_endpoints_list, quiverFeature, cached_range, whole_tensor, SERVER_WORLD_SIZE, NUM_ELEMENT, SAMPLE_SIZE, FEATURE_DIM), join=True)
+    mp.spawn(feature_process, nprocs=args.device_per_node, args=(LOCAL_SERVER_RANK, tensor_endpoints_list, local_tensor_pgas, cached_range, whole_tensor, SERVER_WORLD_SIZE, NUM_ELEMENT, SAMPLE_SIZE, FEATURE_DIM), join=True)
 
     dist_helper.sync_all()
