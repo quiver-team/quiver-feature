@@ -45,13 +45,14 @@ def feature_process(rank, server_rank, tensor_endpoints, singe_machine_feature, 
     # warm up
     data = dist_tensor[indices_device]
     torch.cuda.synchronize()
-    TEST_COUNT = 1000
+    TEST_COUNT = 10000
     start = time.time()
     consumed = 0
     for i in range(TEST_COUNT):
         host_indice = np.random.randint(0, high= SERVER_WORLD_SIZE * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
         indices = torch.from_numpy(host_indice).type(torch.long)
-        indices, _ = torch.sort(indices)
+        if config.TEST_TLB_OPTIMIZATION:
+            indices, _ = torch.sort(indices)
         indices_device = indices.to(rank)
         torch.cuda.synchronize()
 
