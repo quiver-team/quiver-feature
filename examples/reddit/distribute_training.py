@@ -129,7 +129,7 @@ def run(rank, world_size, data_split, edge_index, local_tensor_pgas, quiver_samp
         dist.barrier()
 
         if device_rank == 0:
-            print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}, Epoch Time: {time.time() - epoch_start}')
+            print(f'Server_Rank]-[Device_Rank]: {server_rank}-{device_rank}:\tEpoch: {epoch:03d}, Loss: {loss:.4f}, Epoch Time: {time.time() - epoch_start}')
 
         if process_rank == 0 and epoch % 5 == 0:  # We evaluate on a single GPU for now
             model.eval()
@@ -139,7 +139,7 @@ def run(rank, world_size, data_split, edge_index, local_tensor_pgas, quiver_samp
             acc1 = int(res[train_mask].sum()) / int(train_mask.sum())
             acc2 = int(res[val_mask].sum()) / int(val_mask.sum())
             acc3 = int(res[test_mask].sum()) / int(test_mask.sum())
-            print(f'Train: {acc1:.4f}, Val: {acc2:.4f}, Test: {acc3:.4f}')
+            print(f'Server_Rank]-[Device_Rank]: {server_rank}-{device_rank}:\tTrain: {acc1:.4f}, Val: {acc2:.4f}, Test: {acc3:.4f}')
 
         dist.barrier()
 
