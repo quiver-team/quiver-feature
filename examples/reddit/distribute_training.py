@@ -82,7 +82,7 @@ def run(rank, world_size, data_split, edge_index, local_tensor_pgas, quiver_samp
 
     device_rank = rank
     process_rank = server_rank * device_per_node + rank
-    print(f"Local Rank: {process_rank} In Server {server_rank}, World_Size: {world_size}")
+    print(f"[Server_Rank]-[Device_Rank]: {server_rank}-{device_rank}:\tBegin To Init NCCL")
     dist.init_process_group('nccl', rank=process_rank, world_size=world_size)
 
     torch.torch.cuda.set_device(device_rank)
@@ -95,7 +95,7 @@ def run(rank, world_size, data_split, edge_index, local_tensor_pgas, quiver_samp
 
     pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
-    print(f"Begin To Create DistTensorPGAS In ServerRank = {server_rank}")
+    print(f"[Server_Rank]-[Device_Rank]: {server_rank}-{device_rank}:\tBegin To Create DistTensorPGAS")
     buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor_pgas.shape[1]]
 
     dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, buffer_shape, local_tensor_pgas, cached_range)
