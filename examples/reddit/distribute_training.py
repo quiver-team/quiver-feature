@@ -71,12 +71,18 @@ class SAGE(torch.nn.Module):
         return x_all
 
 
-def run(rank, world_size, data_split, edge_index, x, quiver_sampler, y, num_features, num_classes, server_rank, device_per_node, cached_range, tensor_endpoints):
+def run(rank, world_size, data_split, edge_index, x, quiver_sampler, y, num_features, num_classes, server_rank, device_per_node, cached_range, tensor_endpoints, gt_tensor):
     os.environ['MASTER_ADDR'] = config.MASTER_IP
     os.environ['MASTER_PORT'] = "11421"
+    #os.environ['NCCL_DEBUG'] = "INFO"
+    os.environ["NCCL_SOCKET_IFNAME"] = "eth0"
+    os.environ["TP_SOCKET_IFNAME"] = "eth0"
+    os.environ["GLOO_SOCKET_IFNAME"] = "eth0"
+    os.environ["TP_VERBOSE_LOGGING"] = "0"
+
     device_rank = rank
     process_rank = server_rank * device_per_node + rank
-    print(f"Local Rank: {process_rank}, World_Size: {world_size}")
+    print(f"Local Rank: {process_rank} In Server {server_rank}, World_Size: {world_size}")
     dist.init_process_group('nccl', rank=process_rank, world_size=world_size)
 
     torch.torch.cuda.set_device(device_rank)
@@ -93,6 +99,7 @@ def run(rank, world_size, data_split, edge_index, x, quiver_sampler, y, num_feat
     buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, x.shape[1]]
 
     dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, buffer_shape, x, cached_range)
+    gt_tensor = gt_tensor.to(device_rank)
 
     if process_rank == 0:
         subgraph_loader = NeighborSampler(edge_index, node_idx=None,
@@ -107,7 +114,6 @@ def run(rank, world_size, data_split, edge_index, x, quiver_sampler, y, num_feat
     # Simulate cases those data can not be fully stored by GPU memory
     y = y.to(device_rank)
 
-    print("Begin To Train")
     for epoch in range(1, 21):
         model.train()
         epoch_start = time.time()
@@ -119,18 +125,16 @@ def run(rank, world_size, data_split, edge_index, x, quiver_sampler, y, num_feat
             loss = F.nll_loss(out, y[n_id[:batch_size]])
             loss.backward()
             optimizer.step()
-            print("seeds")
 
-        print("Before Barrier")
         dist.barrier()
 
-        if process_rank == 0:
+        if device_rank == 0:
             print(f'Epoch: {epoch:03d}, Loss: {loss:.4f}, Epoch Time: {time.time() - epoch_start}')
 
         if process_rank == 0 and epoch % 5 == 0:  # We evaluate on a single GPU for now
             model.eval()
             with torch.no_grad():
-                out = model.module.inference(dist_tensor, device_rank, subgraph_loader)
+                out = model.module.inference(gt_tensor, device_rank, subgraph_loader)
             res = out.argmax(dim=-1) == y
             acc1 = int(res[train_mask].sum()) / int(train_mask.sum())
             acc2 = int(res[val_mask].sum()) / int(val_mask.sum())
@@ -208,8 +212,8 @@ if __name__ == '__main__':
     print(f"Begin To Spawn Training Processes")
     mp.spawn(
         run,
-        args=(args.device_per_node * args.server_world_size, data_split, data.edge_index, quiver_feature, quiver_sampler, data.y, dataset.num_features, dataset.num_classes, args.server_rank, args.device_per_node, cached_range, tensor_endpoints),
+        args=(args.device_per_node * args.server_world_size, data_split, data.edge_index, quiver_feature, quiver_sampler, data.y, dataset.num_features, dataset.num_classes, args.server_rank, args.device_per_node, cached_range, tensor_endpoints, data.x),
         nprocs=args.device_per_node,
         join=True
     )
-    dist_helper.sync()
+    dist_helper.sync_all()

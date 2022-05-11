@@ -130,4 +130,7 @@ dmypy.json
 
 .vscode/
 build/
-infinity_realease/  
+infinity_realease/
+
+examples/reddit/processed/
+examples/reddit/raw/
