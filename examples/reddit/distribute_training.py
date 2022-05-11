@@ -20,7 +20,7 @@ import time
 ######################
 import quiver
 from quiver_feature import DistHelper, Range
-from quiver_feature import DistTensorPGAS
+from quiver_feature import DistTensorPGAS, LocalTensorPGAS
 import qvf
 
 import config
@@ -71,7 +71,7 @@ class SAGE(torch.nn.Module):
         return x_all
 
 
-def run(rank, world_size, data_split, edge_index, x, quiver_sampler, y, num_features, num_classes, server_rank, device_per_node, cached_range, tensor_endpoints, gt_tensor):
+def run(rank, world_size, data_split, edge_index, local_tensor_pgas, quiver_sampler, y, num_features, num_classes, server_rank, device_per_node, cached_range, tensor_endpoints, gt_tensor):
     os.environ['MASTER_ADDR'] = config.MASTER_IP
     os.environ['MASTER_PORT'] = "11421"
     #os.environ['NCCL_DEBUG'] = "INFO"
@@ -96,9 +96,9 @@ def run(rank, world_size, data_split, edge_index, x, quiver_sampler, y, num_feat
     pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
     print(f"Begin To Create DistTensorPGAS In ServerRank = {server_rank}")
-    buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, x.shape[1]]
+    buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor_pgas.shape[1]]
 
-    dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, buffer_shape, x, cached_range)
+    dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, buffer_shape, local_tensor_pgas, cached_range)
     gt_tensor = gt_tensor.to(device_rank)
 
     if process_rank == 0:
@@ -205,14 +205,14 @@ if __name__ == '__main__':
     ##############################
     quiver_sampler = quiver.pyg.GraphSageSampler(csr_topo, config.SAMPLE_PARAM, 0, mode='GPU')
 
-    quiver_feature = quiver.Feature(rank=0, device_list=list(range(args.device_per_node)), device_cache_size="2G", cache_policy="device_replicate")
-    quiver_feature.from_cpu_tensor(local_tensor)
+    local_tensor_pgas = LocalTensorPGAS(rank=0, device_list=list(range(args.device_per_node)), device_cache_size="2G", cache_policy="device_replicate")
+    local_tensor_pgas.from_cpu_tensor(local_tensor)
     data_split = (data.train_mask, data.val_mask, data.test_mask)
 
     print(f"Begin To Spawn Training Processes")
     mp.spawn(
         run,
-        args=(args.device_per_node * args.server_world_size, data_split, data.edge_index, quiver_feature, quiver_sampler, data.y, dataset.num_features, dataset.num_classes, args.server_rank, args.device_per_node, cached_range, tensor_endpoints, data.x),
+        args=(args.device_per_node * args.server_world_size, data_split, data.edge_index, local_tensor_pgas, quiver_sampler, data.y, dataset.num_features, dataset.num_classes, args.server_rank, args.device_per_node, cached_range, tensor_endpoints, data.x),
         nprocs=args.device_per_node,
         join=True
     )
