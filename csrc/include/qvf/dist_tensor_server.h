@@ -55,8 +55,8 @@ class DistTensorServer {
     feature_buffer = new infinity::memory::Buffer(
         context, data.data_ptr<float>(), size_in_bytes);
     bufferToken = feature_buffer->createRegionToken();
-    server_thread =
-        std::thread(run, qpFactory, bufferToken, qp_per_pipe * world_size);
+    server_thread = std::thread(run, qpFactory, bufferToken,
+                                qp_per_pipe * (world_size - 1));
   }
 
   static void run(infinity::queues::QueuePairFactory* qpFactory,
@@ -69,11 +69,9 @@ class DistTensorServer {
       qpFactory->acceptIncomingConnection(
           bufferToken, sizeof(infinity::memory::RegionToken));
     }
-    uint64_t seconds = 0;
-    std::cout << "Ready To Serve Data" << std::endl;
+
     while (1) {
       std::this_thread::sleep_for(std::chrono::seconds(10));  // 10s
-      seconds += 10;
     }
   }
 };
