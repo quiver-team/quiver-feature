@@ -117,18 +117,43 @@ def run(rank, world_size, data_split, edge_index, local_tensor_pgas, quiver_samp
     for epoch in range(1, 21):
         model.train()
         epoch_start = time.time()
+        sample_times = []
+        feature_times = []
+        model_times = []
+        total_nodes = 0
+
         for seeds in train_loader:
+
+            sample_start = time.time()
             n_id, batch_size, adjs = quiver_sampler.sample(seeds)
+            sample_times.append(time.time() - sample_start)
+
+            sorted_n_id, prev_order = torch.sort(n_id)
+
+            feature_start = time.time()
+            sampled_feature = dist_tensor[sorted_n_id]
+            feature_times.append(time.time() - feature_start)
+            feature_res = sampled_feature[prev_order]
+
+            model_start = time.time()
             adjs = [adj.to(device_rank) for adj in adjs]
             optimizer.zero_grad()
-            out = model(dist_tensor[n_id].to(device_rank), adjs)
+            out = model(feature_res, adjs)
             loss = F.nll_loss(out, y[n_id[:batch_size]])
             loss.backward()
             optimizer.step()
+            model_times.append(time.time() - model_start)
+
+            total_nodes += n_id.shape[0]
+
+        avg_sample = np.average(sample_times)
+        avg_feature = np.average(feature_times)
+        avg_model = np.average(model_times)
 
         dist.barrier()
 
         if device_rank == 0:
+            print(f"Server_Rank]-[Device_Rank]: {server_rank}-{device_rank}:\tAvg_Sample: {avg_sample:.4f}, Avg_Feature: {avg_feature:.4f}, Avg_Model: {avg_model:.4f}, Avg_Feature_BandWidth = {(total_nodes * local_tensor_pgas.shape[1] * 4 / len(feature_times)/avg_feature/1024/1024):4f} MB/s")
             print(f'Server_Rank]-[Device_Rank]: {server_rank}-{device_rank}:\tEpoch: {epoch:03d}, Loss: {loss:.4f}, Epoch Time: {time.time() - epoch_start}')
 
         if process_rank == 0 and epoch % 5 == 0:  # We evaluate on a single GPU for now
