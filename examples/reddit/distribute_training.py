@@ -153,7 +153,7 @@ def run(rank, world_size, data_split, edge_index, local_tensor_pgas, quiver_samp
         dist.barrier()
 
         if device_rank == 0:
-            print(f"Server_Rank]-[Device_Rank]: {server_rank}-{device_rank}:\tAvg_Sample: {avg_sample:.4f}, Avg_Feature: {avg_feature:.4f}, Avg_Model: {avg_model:.4f}, Avg_Feature_BandWidth = {(total_nodes * local_tensor_pgas.shape[1] * 4 / len(feature_times)/avg_feature/1024/1024):4f} MB/s")
+            print(f"Server_Rank]-[Device_Rank]: {server_rank}-{device_rank}:\tAvg_Sample: {avg_sample:.4f}, Avg_Feature: {avg_feature:.4f}, Avg_Model: {avg_model:.4f}, Avg_Feature_BandWidth = {(total_nodes * local_tensor_pgas.shape[1] * 4 / len(feature_times)/avg_feature/1024/1024):.4f} MB/s")
             print(f'Server_Rank]-[Device_Rank]: {server_rank}-{device_rank}:\tEpoch: {epoch:03d}, Loss: {loss:.4f}, Epoch Time: {time.time() - epoch_start}')
 
         if process_rank == 0 and epoch % 5 == 0:  # We evaluate on a single GPU for now
