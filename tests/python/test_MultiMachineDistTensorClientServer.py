@@ -32,7 +32,12 @@ args = parser.parse_args()
 def feature_process(rank, server_rank, tensor_endpoints, local_tensor_pgas, cached_range, whole_tensor, SERVER_WORLD_SIZE, NUM_ELEMENT, SAMPLE_SIZE, FEATURE_DIM):
 
     torch.cuda.set_device(rank)
-    host_indice = np.random.randint(NUM_ELEMENT * (1 - server_rank), high= (SERVER_WORLD_SIZE - server_rank) * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
+    peer_tensor_endpoint = None
+    for tensor_endpoint in tensor_endpoints:
+        if tensor_endpoint.server_rank != server_rank:
+            peer_tensor_endpoint = tensor_endpoint
+            break
+    host_indice = np.random.randint(peer_tensor_endpoint.range.start, high= peer_tensor_endpoint.range.end, size=(SAMPLE_SIZE, ))
     indices = torch.from_numpy(host_indice).type(torch.long)
     indices_device = indices.to(rank)
 
@@ -47,16 +52,16 @@ def feature_process(rank, server_rank, tensor_endpoints, local_tensor_pgas, cach
     consumed = 0
     for i in range(TEST_COUNT):
 
-        host_indice = np.random.randint(NUM_ELEMENT * (1 - server_rank), high= (SERVER_WORLD_SIZE - server_rank) * NUM_ELEMENT - 1, size=(SAMPLE_SIZE, ))
+        host_indice = np.random.randint(peer_tensor_endpoint.range.start, high= peer_tensor_endpoint.range.end, size=(SAMPLE_SIZE, ))
         indices = torch.from_numpy(host_indice).type(torch.long)
         if config.TEST_TLB_OPTIMIZATION:
             indices, _ = torch.sort(indices)
 
         local_offsets =  torch.arange(0, SAMPLE_SIZE) * 4 * FEATURE_DIM
-        remote_offsets = (indices - NUM_ELEMENT) * 4
+        remote_offsets = (indices - peer_tensor_endpoint.range.start) * 4
 
         start = time.time()
-        dist_tensor.dist_tensor_client.sync_read(1 - server_rank, dist_tensor.registered_tensor, local_offsets, remote_offsets)
+        dist_tensor.dist_tensor_client.sync_read(peer_tensor_endpoint.server_rank, dist_tensor.registered_tensor, local_offsets, remote_offsets)
         consumed += time.time() - start
 
     print(f"Result Check Successed! Throughput = {data.numel() * 4 * TEST_COUNT/ 1024 / 1024 / consumed} MB/s")
@@ -69,7 +74,7 @@ if __name__ == "__main__":
 
     SERVER_WORLD_SIZE = 2
     START_SERVER = True
-    CACHE_RATIO = args.cache_ratio
+    CACHE_RATIO = 0
     LOCAL_SERVER_RANK = args.server_rank
 
 
