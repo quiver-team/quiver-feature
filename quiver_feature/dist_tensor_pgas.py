@@ -91,7 +91,7 @@ class DistTensor:
         all_remote_nodes = torch.masked_select(nodes, all_remote_nodes_mask)
         all_remote_orders = torch.masked_select(input_orders, all_remote_nodes_mask)
 
-        assert all_remote_nodes.shape[0] < self.registered_tensor.shape[0], "Collected Data Exceeds Buffer Size"
+        assert all_remote_nodes.shape[0] <= self.registered_tensor.shape[0], "Collected Data Exceeds Buffer Size"
 
         for server_rank in range(self.world_size):
 
