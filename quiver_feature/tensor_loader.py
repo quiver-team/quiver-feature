@@ -3,7 +3,6 @@ import qvf
 import torch.serialization as se
 from torch.serialization import *
 
-
 class _open_zipfile_reader(torch.serialization._opener):
     def __init__(self, name_or_buffer) -> None:
         super(_open_zipfile_reader, self).__init__(qvf.SharedTensorLoader(name_or_buffer))

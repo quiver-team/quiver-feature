@@ -28,15 +28,15 @@ size_t qvf::SharedLoader::getRecordID(const std::string& name) {
 std::tuple<at::DataPtr, size_t> qvf::SharedLoader::getRecord(
     const std::string& name) {
   std::lock_guard<std::mutex> guard(reader.*RB(reader_lock_));
-  std::cout<<"!!Get record of "<< name<<std::endl;
+//  std::cout<<"!!Get record of "<< name<<std::endl;
   size_t key = getRecordID(name);
   mz_zip_archive_file_stat stat;
   mz_zip_reader_file_stat((reader.*RB(ar_)).get(), key, &stat);
   valid("retrieving file meta-data for ", name.c_str());
-//  at::DataPtr retval = new_fd_storage(stat.m_uncomp_size);
-    at::DataPtr retval = c10::GetCPUAllocator()->allocate(stat.m_uncomp_size);
-  std::cout << "m_uncomp_size is " << stat.m_uncomp_size << std::endl
-            << "shared_ptr is " << retval.get() << std::endl;
+  at::DataPtr retval = new_fd_storage(stat.m_uncomp_size);
+//    at::DataPtr retval = c10::GetCPUAllocator()->allocate(stat.m_uncomp_size);
+//  std::cout << "m_uncomp_size is " << stat.m_uncomp_size << std::endl
+//            << "shared_ptr is " << retval.get() << std::endl;
   mz_zip_reader_extract_to_mem((reader.*RB(ar_)).get(), key, retval.get(),
                                stat.m_uncomp_size, 0);
   valid("reading file ", name.c_str());
