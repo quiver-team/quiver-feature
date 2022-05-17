@@ -34,7 +34,6 @@ ROB_FIELD_FROM_READER(std::mutex, reader_lock_);
 
 struct TORCH_API SharedLoader {
   PyTorchStreamReader reader;
-  //  std::mutex reader_lock_;
   explicit SharedLoader(const std::string& file_name) : reader(file_name) {}
   explicit SharedLoader(std::istream* in) : reader(in) {}
   explicit SharedLoader(std::shared_ptr<ReadAdapterInterface> in)
