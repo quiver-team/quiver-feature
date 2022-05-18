@@ -9,10 +9,12 @@ void register_DistTensorServer(pybind11::module& m);
 void register_PipeParam(pybind11::module& m);
 void register_DistTensorClient(pybind11::module& m);
 void register_ComEndPoint(pybind11::module& m);
+void register_SharedStorageReader(pybind11::module& m);
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   register_TensorEndPoint(m);
   register_DistTensorServer(m);
   register_PipeParam(m);
   register_DistTensorClient(m);
   register_ComEndPoint(m);
+  register_SharedStorageReader(m);
 }

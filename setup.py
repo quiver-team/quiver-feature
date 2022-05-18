@@ -10,6 +10,7 @@ import torch
 from torch.__config__ import parallel_info
 from torch.utils.cpp_extension import BuildExtension
 from torch.utils.cpp_extension import CppExtension, CUDAExtension, CUDA_HOME
+import torch.utils.cpp_extension as cpp_extension
 
 WITH_CUDA = torch.cuda.is_available() and CUDA_HOME is not None
 suffices = ['cpu', 'cuda'] if WITH_CUDA else ['cpu']
@@ -25,6 +26,17 @@ BUILD_DOCS = os.getenv('BUILD_DOCS', '0') == '1'
 WITH_SYMBOLS = True if os.getenv('WITH_SYMBOLS', '0') == '1' else False
 
 
+def get_torch_includes():
+    lib_include = os.path.join(cpp_extension._TORCH_PATH, 'include')
+    paths = [
+        osp.join(lib_include, 'ATen'),
+        osp.join(lib_include, 'c10'),
+        osp.join(lib_include, 'caffe2'),
+    ]
+
+    return paths
+
+
 def get_extensions():
     extensions = []
     libraries = ['ibverbs']
@@ -33,12 +45,14 @@ def get_extensions():
 
     srcs = glob.glob(osp.join(extensions_dir, 'src', '*.cpp'))
     srcs += glob.glob(osp.join(extensions_dir, 'src', '*.cu'))
-    srcs += glob.glob(osp.join(extensions_dir, 'include',"infinity/core" , '*.cpp'))
-    srcs += glob.glob(osp.join(extensions_dir, 'include',"infinity/memory" , '*.cpp'))
-    srcs += glob.glob(osp.join(extensions_dir, 'include',"infinity/queues" , '*.cpp'))
-    srcs += glob.glob(osp.join(extensions_dir, 'include',"infinity/requests" , '*.cpp'))
-    srcs += glob.glob(osp.join(extensions_dir, 'include',"infinity/utils" , '*.cpp'))
+    srcs += glob.glob(osp.join(extensions_dir, 'include', "infinity/core", '*.cpp'))
+    srcs += glob.glob(osp.join(extensions_dir, 'include', "infinity/memory", '*.cpp'))
+    srcs += glob.glob(osp.join(extensions_dir, 'include', "infinity/queues", '*.cpp'))
+    srcs += glob.glob(osp.join(extensions_dir, 'include', "infinity/requests", '*.cpp'))
+    srcs += glob.glob(osp.join(extensions_dir, 'include', "infinity/utils", '*.cpp'))
+    srcs += glob.glob(osp.join(extensions_dir, 'include', "miniz", '*.c'))
     includes = osp.join(extensions_dir, 'include/')
+
     define_macros = [('WITH_PYTHON', None)]
     extra_compile_args = {
         'cxx': ['-O3', '-std=c++17', '-libverbs'],
@@ -49,14 +63,13 @@ def get_extensions():
     extension = Extension(
         'qvf',
         srcs,
-        include_dirs=[includes],
+        include_dirs=[includes] + get_torch_includes(),
         define_macros=define_macros,
         extra_compile_args=extra_compile_args,
         extra_link_args=extra_link_args,
         libraries=libraries,
     )
     extensions += [extension]
-
     return extensions
 
 
@@ -81,7 +94,7 @@ setup(
     ext_modules=get_extensions() if not BUILD_DOCS else [],
     cmdclass={
         'build_ext':
-        BuildExtension.with_options(no_python_abi_suffix=True, use_ninja=False)
+            BuildExtension.with_options(no_python_abi_suffix=True, use_ninja=False)
     },
     packages=find_packages(),
 )
