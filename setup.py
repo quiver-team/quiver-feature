@@ -70,7 +70,6 @@ def get_extensions():
         libraries=libraries,
     )
     extensions += [extension]
-    print()
     return extensions
 
 

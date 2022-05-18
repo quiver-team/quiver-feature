@@ -3,12 +3,13 @@ import qvf
 import torch.serialization as se
 from torch.serialization import *
 
+
 class _open_zipfile_reader(torch.serialization._opener):
     def __init__(self, name_or_buffer) -> None:
         super(_open_zipfile_reader, self).__init__(qvf.SharedTensorLoader(name_or_buffer))
 
 
-def load_shared_tensor(f, map_location=None, pickle_module=pickle, **pickle_load_args):
+def shared_load(f, map_location=None, pickle_module=pickle, **pickle_load_args):
     se._check_dill_version(pickle_module)
 
     if 'encoding' not in pickle_load_args.keys():
