@@ -58,16 +58,25 @@ def qvf_load_huge_shared_tensor():
     input()
 
 
+def test_correctness():
+    a = torch.randn(1000)
+    torch.save(a, 'rand_1000.pt')
+    a.share_memory_()
+    b = quiver_feature.shared_load('rand_1000.pt')
+
+    print((a != b).sum().item())
+
+
+
 if __name__ == '__main__':
+    test_correctness()
     # save_huge_tensor()
 
-    input()
-    print('s1')
-    torch_load_huge_shared_tensor()
-
-    gc.collect()
-
-    print('s2')
-    qvf_load_huge_shared_tensor()
-
-# ps -ef | grep 'python tests/python/test_ShareLoader.py' | grep -v grep | grep "${xzl}" | awk '{print $2}'
+    # input()
+    # print('s1')
+    # torch_load_huge_shared_tensor()
+    #
+    # gc.collect()
+    #
+    # print('s2')
+    # qvf_load_huge_shared_tensor()
