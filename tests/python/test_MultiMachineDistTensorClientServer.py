@@ -17,9 +17,9 @@ from quiver_feature import DistTensorPGAS, LocalTensorPGAS
 MASTER_IP = "155.198.152.17"
 HLPER_PORT = 5678
 
-NUM_ELEMENT = 1000000
-FEATURE_DIM = 600
-SAMPLE_SIZE = 80000
+NUM_ELEMENT = 100#00000 * 3 * 2 * 2 * 2 * 2
+FEATURE_DIM = 128
+SAMPLE_SIZE = 250000
 
 
 parser = argparse.ArgumentParser(description='')
@@ -29,7 +29,7 @@ parser.add_argument('-device_per_node', type=int, help="how many process per ser
 args = parser.parse_args()
 
 
-def feature_process(rank, server_rank, tensor_endpoints, local_tensor_pgas, cached_range, whole_tensor, SERVER_WORLD_SIZE, NUM_ELEMENT, SAMPLE_SIZE, FEATURE_DIM):
+def feature_process(rank, server_rank, tensor_endpoints, cached_range, SAMPLE_SIZE, FEATURE_DIM):
 
     torch.cuda.set_device(rank)
     peer_tensor_endpoint = None
@@ -39,15 +39,12 @@ def feature_process(rank, server_rank, tensor_endpoints, local_tensor_pgas, cach
             break
     host_indice = np.random.randint(peer_tensor_endpoint.range.start, high= peer_tensor_endpoint.range.end, size=(SAMPLE_SIZE, ))
     indices = torch.from_numpy(host_indice).type(torch.long)
-    indices_device = indices.to(rank)
 
     pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
-    dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], local_tensor_pgas, cached_range)
+    dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], None, cached_range)
 
-    # warm up
-    data = dist_tensor[indices_device]
-    torch.cuda.synchronize()
-    TEST_COUNT = 1000
+
+    TEST_COUNT = 1
     start = time.time()
     consumed = 0
     for i in range(TEST_COUNT):
@@ -56,15 +53,15 @@ def feature_process(rank, server_rank, tensor_endpoints, local_tensor_pgas, cach
         indices = torch.from_numpy(host_indice).type(torch.long)
         if config.TEST_TLB_OPTIMIZATION:
             indices, _ = torch.sort(indices)
-
+        
         local_offsets =  torch.arange(0, SAMPLE_SIZE) * 4 * FEATURE_DIM
-        remote_offsets = (indices - peer_tensor_endpoint.range.start) * 4
+        remote_offsets = (indices - peer_tensor_endpoint.range.start) * 4 * FEATURE_DIM
 
         start = time.time()
         dist_tensor.dist_tensor_client.sync_read(peer_tensor_endpoint.server_rank, dist_tensor.registered_tensor, local_offsets, remote_offsets)
         consumed += time.time() - start
 
-    print(f"Result Check Successed! Throughput = {data.numel() * 4 * TEST_COUNT/ 1024 / 1024 / consumed} MB/s")
+    print(f"Result Check Successed! Throughput = {dist_tensor.registered_tensor.numel() * 4 * TEST_COUNT/ 1024 / 1024 / consumed} MB/s")
 
 
 
@@ -82,13 +79,12 @@ if __name__ == "__main__":
     UNCACHED_NUM_ELEMENT = (NUM_ELEMENT * SERVER_WORLD_SIZE - cached_range.end) // SERVER_WORLD_SIZE
 
 
-    host_tensor = np.arange((UNCACHED_NUM_ELEMENT + cached_range.end ) * FEATURE_DIM)
-    host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEATURE_DIM)
-    tensor = torch.from_numpy(host_tensor).type(torch.float32)
 
-    # Build local_tensor_pgas
-    local_tensor_pgas = LocalTensorPGAS(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="device_replicate")
-    local_tensor_pgas.from_cpu_tensor(tensor)
+    tensor = torch.rand((UNCACHED_NUM_ELEMENT + cached_range.end, FEATURE_DIM))
+
+    print(f"Check Tensor Size: {tensor.numel() * 4 / 1024 / 1024 / 1024} GB")
+
+
 
     # Decide Range Information
     range_list = []
@@ -114,9 +110,8 @@ if __name__ == "__main__":
     dist_helper.sync_end()
 
     print(f"Check All TensorEndPoints {tensor_endpoints_list}")
-    whole_tensor = torch.cat([tensor[:cached_range.end, ]] + [tensor[cached_range.end:, ]] * SERVER_WORLD_SIZE)
 
+    mp.spawn(feature_process, nprocs=args.device_per_node, args=(LOCAL_SERVER_RANK, tensor_endpoints_list, cached_range, SAMPLE_SIZE, FEATURE_DIM), join=True)
 
-    mp.spawn(feature_process, nprocs=args.device_per_node, args=(LOCAL_SERVER_RANK, tensor_endpoints_list, local_tensor_pgas, cached_range, whole_tensor, SERVER_WORLD_SIZE, NUM_ELEMENT, SAMPLE_SIZE, FEATURE_DIM), join=True)
-
+    time.sleep(10)
     dist_helper.sync_all()
