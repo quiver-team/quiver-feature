@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
 
 
-    tensor = torch.rand((UNCACHED_NUM_ELEMENT + cached_range.end, FEATURE_DIM))
+    tensor = torch.empty((UNCACHED_NUM_ELEMENT + cached_range.end, FEATURE_DIM))
 
     print(f"Check Tensor Size: {tensor.numel() * 4 / 1024 / 1024 / 1024} GB")
 

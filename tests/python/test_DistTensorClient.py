@@ -6,8 +6,8 @@ import config
 import time
 
 pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
-local_com_endpoint = qvf.ComEndPoint(0, config.SERVER_IP, config.PORT_NUMBER)
-remote_com_endpoint = qvf.ComEndPoint(1, config.SERVER_IP, config.PORT_NUMBER)
+local_com_endpoint = qvf.ComEndPoint(0, config.MASTER_IP, config.PORT_NUMBER)
+remote_com_endpoint = qvf.ComEndPoint(1, config.MASTER_IP, config.PORT_NUMBER)
 dist_tensor_client = qvf.DistTensorClient(0, [local_com_endpoint, remote_com_endpoint], pipe_param)
 registered_tensor = dist_tensor_client.create_registered_float32_tensor([config.SAMPLE_NUM, config.FEATURE_DIM])
 

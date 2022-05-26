@@ -9,5 +9,6 @@ data = torch.empty((config.NODE_COUNT, config.FEATURE_DIM), dtype=torch.float)
 for row in range(config.NODE_COUNT):
     data[row] = row
 
-dist_tensor_server = qvf.DistTensorServer(config.PORT_NUMBER, 1, config.QP_NUM)
+dist_tensor_server = qvf.DistTensorServer(config.PORT_NUMBER, 2, config.QP_NUM)
 dist_tensor_server.serve_tensor(data)
+dist_tensor_server.join()

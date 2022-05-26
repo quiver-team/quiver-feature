@@ -35,6 +35,15 @@ int OperationFlags::ibvFlags() {
   return flags;
 }
 
+int ctx_set_out_reads(struct ibv_context *context) {
+  int max_reads = 0;
+  struct ibv_device_attr attr;
+  if (!ibv_query_device(context, &attr)) {
+    max_reads = attr.max_qp_rd_atom;
+  }
+  return max_reads;
+}
+
 QueuePair::QueuePair(infinity::core::Context* context) : context(context) {
   ibv_qp_init_attr qpInitAttributes;
   memset(&qpInitAttributes, 0, sizeof(qpInitAttributes));
@@ -128,7 +137,7 @@ void QueuePair::activate(uint16_t remoteDeviceId,
   qpAttributes.retry_cnt = 7;
   qpAttributes.rnr_retry = 7;
   qpAttributes.sq_psn = this->getSequenceNumber();
-  qpAttributes.max_rd_atomic = 16;
+  qpAttributes.max_rd_atomic = ctx_set_out_reads(context->getInfiniBandContext());
 
   returnValue = ibv_modify_qp(this->ibvQueuePair, &qpAttributes,
                               IBV_QP_STATE | IBV_QP_TIMEOUT | IBV_QP_RETRY_CNT |
