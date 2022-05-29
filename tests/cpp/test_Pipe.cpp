@@ -121,7 +121,7 @@ void test_pipe(int argc, char** argv) {
 
   qps.resize(QP_NUM);
   qvf::ComEndPoint endpoint(0, SERVER_IP, PORT_NUMBER);
-  qvf::PipeParam pipe_param(QP_NUM, CQ_MOD, CTX_POLL_BATCH, TX_DEPTH,
+  qvf::PipeParam pipe_param(QP_NUM, CTX_POLL_BATCH, TX_DEPTH,
                             POST_LIST_SIZE);
   qvf::Pipe quiver_pipe(context, qpFactory, endpoint, pipe_param);
   quiver_pipe.connect();

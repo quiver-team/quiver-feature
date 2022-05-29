@@ -93,7 +93,7 @@ def run(rank, world_size, data_split, edge_index, local_tensor_pgas, quiver_samp
 
     train_loader = torch.utils.data.DataLoader(train_idx, batch_size=config.BATCH_SIZE, shuffle=True, drop_last=True)
 
-    pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
+    pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
     print(f"[Server_Rank]-[Device_Rank]: {server_rank}-{device_rank}:\tBegin To Create DistTensorPGAS")
     buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor_pgas.shape[1]]

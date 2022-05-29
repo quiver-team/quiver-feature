@@ -85,7 +85,7 @@ public:
 	/*
 		Poll expected signal from completion queue
 	*/
-	void batchPollSendCompletionQueue(int poll_batch, int expected_num, ibv_wc* wc);
+	int batchPollSendCompletionQueue(int poll_batch, int expected_num, ibv_wc* wc, bool force_all);
 
 public:
 

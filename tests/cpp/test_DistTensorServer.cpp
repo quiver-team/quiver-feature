@@ -31,7 +31,7 @@ float* allocate_float_feature(bool set_value) {
 }
 
 void test_dist_tensor_server(int argc, char** argv) {
-  qvf::PipeParam pipe_param(QP_NUM, CQ_MOD, CTX_POLL_BATCH, TX_DEPTH,
+  qvf::PipeParam pipe_param(QP_NUM, CTX_POLL_BATCH, TX_DEPTH,
                             POST_LIST_SIZE);
   qvf::DistTensorServer dist_tensor_server(PORT_NUMBER, 1, 1);
   float* server_data_buffer = allocate_float_feature(true);

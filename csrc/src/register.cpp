@@ -30,7 +30,7 @@ void register_DistTensorServer(pybind11::module& m) {
 
 void register_PipeParam(pybind11::module& m) {
   py::class_<qvf::PipeParam>(m, "PipeParam")
-      .def(py::init<int, int, int, int, int>());
+      .def(py::init<int, int, int, int>());
 }
 
 void register_DistTensorClient(pybind11::module& m) {

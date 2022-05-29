@@ -86,7 +86,7 @@ else:
 
 dist_helper.sync_end()
 
-pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
+pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 dist_tensor = DistTensorPGAS(DEVICE_RANK, LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], shard_tensor, cached_range)
 
 start = time.time()

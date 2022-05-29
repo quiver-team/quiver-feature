@@ -18,7 +18,7 @@ x = threading.Thread(target=server_thread)
 x.daemon = True
 x.start()
 
-pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
+pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 local_com_endpoint = qvf.ComEndPoint(0, config.SERVER_IP, config.PORT_NUMBER)
 remote_com_endpoint = qvf.ComEndPoint(1, config.SERVER_IP, config.PORT_NUMBER)
 dist_tensor_client = qvf.DistTensorClient(0, [local_com_endpoint, remote_com_endpoint], pipe_param)

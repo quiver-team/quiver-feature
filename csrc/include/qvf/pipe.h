@@ -23,32 +23,27 @@ struct PipeParam {
   int ctx_poll_batch;
   int tx_depth;
   int post_list_size;
-  int cq_mode;
   PipeParam() {}
   PipeParam(int qp_num,
-            int cq_mode,
             int ctx_poll_batch,
             int tx_depth,
             int post_list_size) {
     this->qp_num = qp_num;
-    this->cq_mode = cq_mode;
     this->ctx_poll_batch = ctx_poll_batch;
     this->tx_depth = tx_depth;
     this->post_list_size = post_list_size;
   }
   void set_params(int qp_num,
-                  int cq_mode,
                   int ctx_poll_batch,
                   int tx_depth,
                   int post_list_size) {
     this->qp_num = qp_num;
-    this->cq_mode = cq_mode;
     this->ctx_poll_batch = ctx_poll_batch;
     this->tx_depth = tx_depth;
     this->post_list_size = post_list_size;
   }
   PipeParam& operator=(const PipeParam& pipe_param) {
-    set_params(pipe_param.qp_num, pipe_param.cq_mode, pipe_param.ctx_poll_batch,
+    set_params(pipe_param.qp_num, pipe_param.ctx_poll_batch,
                pipe_param.tx_depth, pipe_param.post_list_size);
     return *this;
   }
@@ -97,7 +92,7 @@ class Pipe {
     qps.resize(pipe_param.qp_num);
     remote_buffer_tokens.resize(pipe_param.qp_num);
     requests_size =
-        pipe_param.tx_depth / pipe_param.cq_mode / pipe_param.post_list_size;
+        pipe_param.tx_depth / pipe_param.post_list_size;
     requests.resize(requests_size);
     send_buffer.resize(pipe_param.post_list_size);
     wc_buffer.resize(pipe_param.ctx_poll_batch);
@@ -135,27 +130,18 @@ class Pipe {
       // std::cout<<"Check Batch_Read_Size " << batch_read_size << std::endl;
       // std::cout<<"Check Current Index " << pipe_param.post_list_size *
       // post_index <<" Total Size " << local_offsets.size()<<std::endl;
-      if (post_index == post_list_cnt - 1 ||
-          post_index % pipe_param.cq_mode == (pipe_param.cq_mode - 1)) {
-        qps[post_index % pipe_param.qp_num]->multiRead(
-            batch_read_size, local_buffer,
-            &local_offsets[post_index * pipe_param.post_list_size],
-            remote_buffer_tokens[post_index % pipe_param.qp_num],
-            &remote_offsets[post_index * pipe_param.post_list_size], stride,
-            infinity::queues::OperationFlags(), requests[epoch_scnt],
-            send_buffer);
-        epoch_scnt += 1;
-      } else {
-        qps[post_index % pipe_param.qp_num]->multiRead(
-            batch_read_size, local_buffer,
-            &local_offsets[post_index * pipe_param.post_list_size],
-            remote_buffer_tokens[post_index % pipe_param.qp_num],
-            &remote_offsets[post_index * pipe_param.post_list_size], stride,
-            infinity::queues::OperationFlags(), nullptr, send_buffer);
-      }
+      qps[post_index % pipe_param.qp_num]->multiRead(
+          batch_read_size, local_buffer,
+          &local_offsets[post_index * pipe_param.post_list_size],
+          remote_buffer_tokens[post_index % pipe_param.qp_num],
+          &remote_offsets[post_index * pipe_param.post_list_size], stride,
+          infinity::queues::OperationFlags(), requests[epoch_scnt],
+          send_buffer);
+      epoch_scnt += 1;
+
       if (epoch_scnt == requests_size || post_index == post_list_cnt - 1) {
         context->batchPollSendCompletionQueue(pipe_param.ctx_poll_batch,
-                                              epoch_scnt, wc_buffer.ptr());
+                                              epoch_scnt, wc_buffer.ptr(), post_index == post_list_cnt - 1);
         epoch_scnt = 0;
       }
     }
@@ -197,28 +183,19 @@ class Pipe {
       // << stride << std::endl;
       //  post_index <<" Total Size " <<
       //  local_offsets_tensor.size(0)<<std::endl;
-      if (post_index == post_list_cnt - 1 ||
-          post_index % pipe_param.cq_mode == (pipe_param.cq_mode - 1)) {
-        qps[post_index % pipe_param.qp_num]->multiRead(
-            batch_read_size, local_buffer,
-            &local_offsets[post_index * pipe_param.post_list_size],
-            remote_buffer_tokens[post_index % pipe_param.qp_num],
-            &remote_offsets[post_index * pipe_param.post_list_size], stride,
-            infinity::queues::OperationFlags(), requests[epoch_scnt],
-            send_buffer);
-        epoch_scnt += 1;
-      } else {
-        qps[post_index % pipe_param.qp_num]->multiRead(
-            batch_read_size, local_buffer,
-            &local_offsets[post_index * pipe_param.post_list_size],
-            remote_buffer_tokens[post_index % pipe_param.qp_num],
-            &remote_offsets[post_index * pipe_param.post_list_size], stride,
-            infinity::queues::OperationFlags(), nullptr, send_buffer);
-      }
+      qps[post_index % pipe_param.qp_num]->multiRead(
+          batch_read_size, local_buffer,
+          &local_offsets[post_index * pipe_param.post_list_size],
+          remote_buffer_tokens[post_index % pipe_param.qp_num],
+          &remote_offsets[post_index * pipe_param.post_list_size], stride,
+          infinity::queues::OperationFlags(), requests[epoch_scnt],
+          send_buffer);
+      epoch_scnt += 1;
+    
       if (epoch_scnt == requests_size || post_index == post_list_cnt - 1) {
-        context->batchPollSendCompletionQueue(pipe_param.ctx_poll_batch,
-                                              epoch_scnt, wc_buffer.ptr());
-        epoch_scnt = 0;
+        int cq_num = context->batchPollSendCompletionQueue(pipe_param.ctx_poll_batch,
+                                              epoch_scnt, wc_buffer.ptr(), post_index == post_list_cnt - 1);
+        epoch_scnt -= cq_num;
       }
     }
   }

@@ -51,7 +51,7 @@ void check_tensor_res(torch::Tensor& res_tensor,
 }
 
 void test_dist_tensor_client(int argc, char** argv) {
-  qvf::PipeParam pipe_param(QP_NUM, CQ_MOD, CTX_POLL_BATCH, TX_DEPTH,
+  qvf::PipeParam pipe_param(QP_NUM, CTX_POLL_BATCH, TX_DEPTH,
                             POST_LIST_SIZE);
 
   qvf::ComEndPoint local_com_end_point(0, SERVER_IP, PORT_NUMBER);

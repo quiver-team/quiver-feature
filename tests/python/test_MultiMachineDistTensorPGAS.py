@@ -38,7 +38,7 @@ def feature_process(rank, server_rank, tensor_endpoints, local_tensor_pgas, cach
     indices = torch.from_numpy(host_indice).type(torch.long)
     indices_device = indices.to(rank)
 
-    pipe_param = qvf.PipeParam(config.QP_NUM, config.CQ_MOD, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
+    pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
     dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], local_tensor_pgas, cached_range)
 
     # warm up

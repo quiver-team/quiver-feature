@@ -221,9 +221,11 @@ bool Context::pollSendCompletionQueue() {
   return false;
 }
 
-void Context::batchPollSendCompletionQueue(int poll_batch,
+int Context::batchPollSendCompletionQueue(int poll_batch,
                                            int expected_num,
-                                           ibv_wc* wc) {
+                                           ibv_wc* wc,
+                                           bool force_all) {
+  int cq_num = 0;
   while (expected_num > 0) {
     int ne = ibv_poll_cq(this->ibvSendCompletionQueue, poll_batch, wc);
     if (ne > 0) {
@@ -234,11 +236,16 @@ void Context::batchPollSendCompletionQueue(int poll_batch,
           fprintf(stderr, "Request failed %d\n", wc_id);
         }
       }
+      cq_num += ne;
+      if(!force_all){
+        break;
+      }
 
     } else if (ne < 0) {
       fprintf(stderr, "poll CQ failed %d\n", ne);
     }
   }
+  return cq_num;
 }
 
 void Context::registerQueuePair(infinity::queues::QueuePair* queuePair) {
