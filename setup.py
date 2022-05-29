@@ -85,7 +85,7 @@ setup(
     url='https://github.com/quiver-team/quiver_feature',
     description=('PyTorch Library for graph learning sampling'),
     keywords=['pytorch', 'sparse', 'graph'],
-    license='MIT',
+    license='Apache',
     python_requires='>=3.6',
     install_requires=install_requires,
     setup_requires=setup_requires,
