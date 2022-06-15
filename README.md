@@ -1,22 +1,28 @@
 # Quiver-Feature
-Quiver-Feature is a high performance component for distributed feature collections. It is based on quiver.Feature and using RDMA for cross-machine data access. 
-
-Compared with [TensorPipe](https://github.com/pytorch/tensorpipe), Quiver-Feature has 
-
+Quiver-Feature is a high performance component for distributed feature collections for GNN training on extreme large graphs. It has **5-10x throughput performance** compared with current solutions in different GNN systems, such as DGL, PyG, GraphLearn.
 
 # Install
 
 ## Pip Install
 1. Install the Quiver pip package [from here](https://github.com/quiver-team/torch-quiver).
+
 2. Install Quiver-Feature pip package
 
         pip install quiver-feature 
 
+## Install From Source
+
+        git clone git@github.com:quiver-team/quiver-feature.
+        pip install .
+
+
 We have tested Quiver with the following setup:
 
-OS: Ubuntu 18.04, Ubuntu 20.04
-CUDA: 10.2, 11.1
-GPU: P100, V100, Titan X, A6000
+        OS: Ubuntu 18.04, Ubuntu 20.04
+
+        CUDA: 10.2, 11.1
+
+        GPU: P100, V100, Titan X, A6000
 
 ## Test Install
 
@@ -25,9 +31,7 @@ GPU: P100, V100, Titan X, A6000
         git clone git@github.com:quiver-team/quiver-feature.git
         cd quiver-feature/tests/python
 
-2. Change `config.py` and set `MASTER_IP` as your machine's IP address.
-
-3. Start your feature server, and wait for data registeration to complete.
+2. Start your feature server, and wait for data registeration to complete.
 
     
         python3 test_DistTensorServer.py
@@ -36,7 +40,7 @@ GPU: P100, V100, Titan X, A6000
 
         Buffer Registeration Done! Ready To Receive Connections Start Your Clients Now
 
-4. Start your feature client:
+3. Start your feature client:
         
         python3 test_DistTensorClient.py
 
@@ -47,21 +51,3 @@ GPU: P100, V100, Titan X, A6000
         Using TLB Optimization
         Begin To Check Result...
         Result Check Passed!, Throughput = xxxxx MB/s
-
-
-## Install from Source
-
-To build Quiver-Feature python package from source:
-
-        git@github.com:quiver-team/quiver-feature.git
-        pip install .
-
-If you want to develop using our C++ APIs or you want to run C++ tests:
-
-        git@github.com:quiver-team/quiver-feature.git
-        sh build.sh
-
-
-
-## Quick Start
-
