@@ -71,7 +71,7 @@ class SAGE(torch.nn.Module):
         return x_all
 
 
-def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor, quiver_sampler, y, num_features, num_classes):
+def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor, y, num_features, num_classes):
     os.environ['MASTER_ADDR'] = config.MASTER_IP
     os.environ['MASTER_PORT'] = "11421"
     #os.environ['NCCL_DEBUG'] = "INFO"
@@ -91,11 +91,13 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
     train_idx = train_mask.nonzero(as_tuple=False).view(-1)
     train_idx = train_idx.split(train_idx.size(0) // world_size)[process_rank]
 
-    train_loader = torch.utils.data.DataLoader(train_idx, batch_size=config.BATCH_SIZE, shuffle=True, drop_last=True)
-
+    train_loader = NeighborSampler(edge_index, node_idx=train_idx,
+                                   sizes=config.SAMPLE_PARAM, batch_size=config.BATCH_SIZE,
+                                   shuffle=True, persistent_workers=True,
+                                   num_workers= 3)
     if process_rank == 0:
         subgraph_loader = NeighborSampler(edge_index, node_idx=None,
-                                          sizes=[-1], batch_size=2048,
+                                          sizes=[-1], batch_size=config.BATCH_SIZE,
                                           shuffle=False, num_workers=0)
 
     torch.manual_seed(12345)
@@ -113,19 +115,17 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
         feature_times = []
         model_times = []
         total_nodes = 0
-
-        for seeds in train_loader:
+        sample_start = time.time()
+        for batch_size, n_id, adjs in train_loader:
 
             # Record Sub-Graph Sample Time
-            sample_start = time.time()
-            n_id, batch_size, adjs = quiver_sampler.sample(seeds)
             sample_times.append(time.time() - sample_start)
 
             # Record Feature Collection Time
             feature_start = time.time()
             feature_res = dist_tensor[n_id]
             feature_times.append(time.time() - feature_start)
-            
+
             # Record Model Training Time
             model_start = time.time()
             adjs = [adj.to(device_rank) for adj in adjs]
@@ -137,8 +137,10 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
             model_times.append(time.time() - model_start)
 
             total_nodes += n_id.shape[0]
+            
+            sample_start = time.time()
 
-        avg_sample = np.average(sample_times)
+        avg_sample = np.average(sample_times[1:])
         avg_feature = np.average(feature_times)
         avg_model = np.average(model_times)
 
@@ -159,6 +161,8 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
             print(f'Process_Rank: {process_rank}:\tTrain: {acc1:.4f}, Val: {acc2:.4f}, Test: {acc3:.4f}')
 
         dist.barrier()
+        
+
 
     dist.destroy_process_group()
 
@@ -221,12 +225,7 @@ if __name__ == '__main__':
     # Wait to sync
     dist_helper.sync_end()
 
-    ##############################
-    # Create Sampler And Feature
-    ##############################
-    quiver_sampler = quiver.pyg.GraphSageSampler(csr_topo, config.SAMPLE_PARAM, 0, mode='GPU')
-
-    local_tensor_pgas = LocalTensorPGAS(rank=0, device_list=list(range(args.device_per_node)), device_cache_size="2G", cache_policy="device_replicate")
+    local_tensor_pgas = LocalTensorPGAS(rank=0, device_list=list(range(args.device_per_node)), device_cache_size="55M", cache_policy="device_replicate")
     local_tensor_pgas.from_cpu_tensor(local_tensor)
     data_split = (data.train_mask, data.val_mask, data.test_mask)
 
@@ -241,7 +240,7 @@ if __name__ == '__main__':
     process_rank_base = args.device_per_node * args.server_rank
     mp.spawn(
         run,
-        args=(process_rank_base, world_size, data_split, data.edge_index, dist_tensor, quiver_sampler, data.y, dataset.num_features, dataset.num_classes),
+        args=(process_rank_base, world_size, data_split, data.edge_index, dist_tensor, data.y, dataset.num_features, dataset.num_classes),
         nprocs=args.device_per_node,
         join=True
     )
