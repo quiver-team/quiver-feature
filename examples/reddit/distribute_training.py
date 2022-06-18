@@ -71,7 +71,7 @@ class SAGE(torch.nn.Module):
         return x_all
 
 
-def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor, quiver_sampler, y, num_features, num_classes, gt_tensor):
+def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor, quiver_sampler, y, num_features, num_classes):
     os.environ['MASTER_ADDR'] = config.MASTER_IP
     os.environ['MASTER_PORT'] = "11421"
     #os.environ['NCCL_DEBUG'] = "INFO"
@@ -92,10 +92,6 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
     train_idx = train_idx.split(train_idx.size(0) // world_size)[process_rank]
 
     train_loader = torch.utils.data.DataLoader(train_idx, batch_size=config.BATCH_SIZE, shuffle=True, drop_last=True)
-
-
-
-    gt_tensor = gt_tensor.to(device_rank)
 
     if process_rank == 0:
         subgraph_loader = NeighborSampler(edge_index, node_idx=None,
@@ -120,17 +116,17 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
 
         for seeds in train_loader:
 
+            # Record Sub-Graph Sample Time
             sample_start = time.time()
             n_id, batch_size, adjs = quiver_sampler.sample(seeds)
             sample_times.append(time.time() - sample_start)
 
-            sorted_n_id, prev_order = torch.sort(n_id)
-
+            # Record Feature Collection Time
             feature_start = time.time()
-            sampled_feature = dist_tensor[sorted_n_id]
+            feature_res = dist_tensor[n_id]
             feature_times.append(time.time() - feature_start)
-            feature_res = sampled_feature[prev_order]
-
+            
+            # Record Model Training Time
             model_start = time.time()
             adjs = [adj.to(device_rank) for adj in adjs]
             optimizer.zero_grad()
@@ -155,7 +151,7 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
         if process_rank == 0 and epoch % 5 == 0:  # We evaluate on a single GPU for now
             model.eval()
             with torch.no_grad():
-                out = model.module.inference(gt_tensor, device_rank, subgraph_loader)
+                out = model.module.inference(dist_tensor, device_rank, subgraph_loader)
             res = out.argmax(dim=-1) == y
             acc1 = int(res[train_mask].sum()) / int(train_mask.sum())
             acc2 = int(res[val_mask].sum()) / int(val_mask.sum())
@@ -245,7 +241,7 @@ if __name__ == '__main__':
     process_rank_base = args.device_per_node * args.server_rank
     mp.spawn(
         run,
-        args=(process_rank_base, world_size, data_split, data.edge_index, dist_tensor, quiver_sampler, data.y, dataset.num_features, dataset.num_classes, data.x),
+        args=(process_rank_base, world_size, data_split, data.edge_index, dist_tensor, quiver_sampler, data.y, dataset.num_features, dataset.num_classes),
         nprocs=args.device_per_node,
         join=True
     )

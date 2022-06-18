@@ -31,7 +31,7 @@ args = parser.parse_args()
 def feature_process(rank, dist_tensor, whole_tensor, SAMPLE_SIZE):
 
     torch.cuda.set_device(rank)
-    host_indice = np.random.randint(0, high= dist_tensor.size(1) - 1, size=(SAMPLE_SIZE, ))
+    host_indice = np.random.randint(0, high= dist_tensor.shape[0] - 1, size=(SAMPLE_SIZE, ))
     indices = torch.from_numpy(host_indice).type(torch.long)
     indices_device = indices.to(rank)
 
@@ -54,11 +54,8 @@ def feature_process(rank, dist_tensor, whole_tensor, SAMPLE_SIZE):
         data = dist_tensor[indices_device]
         torch.cuda.synchronize()
         consumed += time.time() - start
+        assert torch.equal(data.cpu(), whole_tensor[indices]), "Result Check Failed!"
 
-    data = data.cpu()
-    data_gt = whole_tensor[indices]
-
-    assert torch.equal(data, data_gt), "Result Check Failed!"
 
     print(f"Result Check Successed! Throughput = {data.numel() * 4 * TEST_COUNT/ 1024 / 1024 / consumed} MB/s")
 

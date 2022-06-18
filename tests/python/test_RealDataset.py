@@ -60,15 +60,12 @@ parser.add_argument("-cache_ratio", type=float, default=0.0, help ="how much dat
 args = parser.parse_args()
 
 
-def feature_process(rank, server_rank, tensor_endpoints, local_tensor_pgas, cached_range, whole_tensor,SAMPLE_SIZE, FEATURE_DIM, TOTAL_NODE_SIZE):
+def feature_process(rank, dist_tensor, whole_tensor, SAMPLE_SIZE):
 
     torch.cuda.set_device(rank)
     host_indice = np.random.randint(0, high= TOTAL_NODE_SIZE - 1, size=(SAMPLE_SIZE, ))
     indices = torch.from_numpy(host_indice).type(torch.long)
     indices_device = indices.to(rank)
-
-    pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
-    dist_tensor = DistTensorPGAS(rank, server_rank, tensor_endpoints, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], local_tensor_pgas, cached_range)
 
     # warm up
     data = dist_tensor[indices_device]
@@ -145,7 +142,10 @@ if __name__ == "__main__":
     print(f"Check All TensorEndPoints {tensor_endpoints_list}")
     whole_tensor = torch.cat([tensor[:cached_range.end, ]] + [tensor[cached_range.end:, ]] * SERVER_WORLD_SIZE)
 
+    pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
-    mp.spawn(feature_process, nprocs=args.device_per_node, args=(LOCAL_SERVER_RANK, tensor_endpoints_list, local_tensor_pgas, cached_range, whole_tensor, SAMPLE_SIZE, local_tensor_pgas.shape[1], TOTAL_NODE_SIZE), join=True)
+    dist_tensor = DistTensorPGAS(LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], None, cached_range)
+
+    mp.spawn(feature_process, nprocs=args.device_per_node, args=(dist_tensor, whole_tensor, SAMPLE_SIZE), join=True)
 
     dist_helper.sync_all()
