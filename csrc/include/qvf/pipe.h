@@ -42,6 +42,22 @@ struct PipeParam {
     this->tx_depth = tx_depth;
     this->post_list_size = post_list_size;
   }
+  void set_param_vec(std::vector<int> param_vec){
+    qp_num = param_vec[0];
+    ctx_poll_batch = param_vec[1];
+    tx_depth = param_vec[2];
+    post_list_size = param_vec[3];
+  }
+
+  std::vector<int> get_param_vec(){
+    std::vector<int> params;
+    params.push_back(qp_num);
+    params.push_back(ctx_poll_batch);
+    params.push_back(tx_depth);
+    params.push_back(post_list_size);
+    return params;
+  }
+
   PipeParam& operator=(const PipeParam& pipe_param) {
     set_params(pipe_param.qp_num, pipe_param.ctx_poll_batch,
                pipe_param.tx_depth, pipe_param.post_list_size);

@@ -1,7 +1,7 @@
 import torch
 import qvf
 from typing import List
-from .common import Range, TensorEndPoint
+from .common import Range, TensorEndPoint, PipeParam
 from .local_tensor_pgas import LocalTensorPGAS
 
 class DistTensor:
@@ -10,12 +10,11 @@ class DistTensor:
         self.server_rank = server_rank
         self.world_size = len(tensor_endpoints)
         self.tensor_endpoints = sorted(tensor_endpoints, key= lambda x: x.server_rank)
+        self.com_endpoints = [qvf.ComEndPoint(item.server_rank, item.ip, item.port) for item in self.tensor_endpoints]
         self.pipe_param = pipe_param
         self.buffer_tensor_shape = buffer_tensor_shape
-        com_endpoints = [qvf.ComEndPoint(item.server_rank, item.ip, item.port) for item in tensor_endpoints]
-        self.dist_tensor_client = qvf.DistTensorClient(server_rank, com_endpoints, pipe_param)
-        self.registered_tensor = torch.zeros(buffer_tensor_shape).pin_memory()
-        self.dist_tensor_client.register_float32_tensor(self.registered_tensor)
+
+        self.inited = False
 
         # About ShardTensor
         self.local_tensor_pgas = local_tensor_pgas
@@ -24,6 +23,15 @@ class DistTensor:
         self.order_transform = None
         if order_transform is not None:
             self.order_transform = order_transform.to(device_rank)
+
+    def lazy_init(self):
+        if self.inited:
+            return
+        
+        self.inited = True
+        self.dist_tensor_client = qvf.DistTensorClient(self.server_rank, self.com_endpoints, self.pipe_param)
+        self.registered_tensor = torch.zeros(self.buffer_tensor_shape).pin_memory()
+        self.dist_tensor_client.register_float32_tensor(self.registered_tensor)
 
     def size(self, dim):
         assert dim < 2, "DistTensorPGAS is 2-dimensional"
@@ -50,6 +58,7 @@ class DistTensor:
 
     def __getitem__(self, nodes):
 
+        self.lazy_init()
         nodes = nodes.cuda()
         if self.order_transform is not None:
             nodes = self.order_transform[nodes]
