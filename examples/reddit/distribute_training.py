@@ -137,7 +137,7 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
             model_times.append(time.time() - model_start)
 
             total_nodes += n_id.shape[0]
-            
+
             sample_start = time.time()
 
         avg_sample = np.average(sample_times[1:])
@@ -205,11 +205,10 @@ if __name__ == '__main__':
     print("Loading Reddit Dataset")
     dataset = Reddit('./')
     data = dataset[0]
-    csr_topo = quiver.CSRTopo(data.edge_index)
 
 
     # Simulate Load Local data partition
-    local_tensor, cached_range, local_range = load_partitioned_data(args, data, csr_topo.node_count)
+    local_tensor, cached_range, local_range = load_partitioned_data(args, data, data.x.shape[0])
 
     print("Exchange TensorPoints Information")
     dist_helper = DistHelper(config.MASTER_IP, config.HLPER_PORT, args.server_world_size, args.server_rank)
