@@ -17,9 +17,9 @@ void register_ComEndPoint(pybind11::module& m) {
   py::class_<qvf::ComEndPoint>(m, "ComEndPoint")
       .def(py::init<int, std::string, int>())
       .def(py::init<>())
-      .def("rank", &qvf::ComEndPoint::get_rank(), py::call_guard<py::gil_scoped_release>())
-      .def("address", &qvf::ComEndPoint::get_address(), py::call_guard<py::gil_scoped_release>())
-      .def("port", &qvf::ComEndPoint::get_port(), py::call_guard<py::gil_scoped_release>());
+      .def("rank", &qvf::ComEndPoint::get_rank, py::call_guard<py::gil_scoped_release>())
+      .def("address", &qvf::ComEndPoint::get_address, py::call_guard<py::gil_scoped_release>())
+      .def("port", &qvf::ComEndPoint::get_port, py::call_guard<py::gil_scoped_release>());
 }
 
 void register_DistTensorServer(pybind11::module& m) {

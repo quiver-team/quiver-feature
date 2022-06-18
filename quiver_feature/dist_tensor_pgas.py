@@ -1,37 +1,51 @@
 import torch
 import qvf
 from typing import List
-from .common import Range, TensorEndPoint, PipeParam
+from .common import Range, TensorEndPoint
 from .local_tensor_pgas import LocalTensorPGAS
 
 class DistTensor:
-    def __init__(self, device_rank, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, local_tensor_pgas: LocalTensorPGAS, cached_range: Range= Range(start=0, end=0), order_transform:torch.Tensor=None)-> None:
+    def __init__(self, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, local_tensor_pgas: LocalTensorPGAS, cached_range: Range= Range(start=0, end=0), order_transform:torch.Tensor=None)-> None:
+
         # About DistTensorClient
         self.server_rank = server_rank
         self.world_size = len(tensor_endpoints)
         self.tensor_endpoints = sorted(tensor_endpoints, key= lambda x: x.server_rank)
-        self.com_endpoints = [qvf.ComEndPoint(item.server_rank, item.ip, item.port) for item in self.tensor_endpoints]
-        self.pipe_param = pipe_param
         self.buffer_tensor_shape = buffer_tensor_shape
+        self.pipe_param = pipe_param
+        self.com_endpoints = [qvf.ComEndPoint(item.server_rank, item.ip, item.port) for item in tensor_endpoints]
 
+        # About Lazy Init
         self.inited = False
 
         # About ShardTensor
         self.local_tensor_pgas = local_tensor_pgas
         self.cached_range = cached_range
-        self.device_rank = device_rank
-        self.order_transform = None
-        if order_transform is not None:
-            self.order_transform = order_transform.to(device_rank)
-
+        self.device_rank = -1
+        self.order_transform = order_transform
+        
     def lazy_init(self):
         if self.inited:
             return
-        
         self.inited = True
+
+        self.device_rank = torch.cuda.current_device()
+
+        # Create DistTensorClient
         self.dist_tensor_client = qvf.DistTensorClient(self.server_rank, self.com_endpoints, self.pipe_param)
         self.registered_tensor = torch.zeros(self.buffer_tensor_shape).pin_memory()
         self.dist_tensor_client.register_float32_tensor(self.registered_tensor)
+
+        if self.order_transform is not None:
+            self.order_transform = self.order_transform.to(self.device_rank)
+
+
+    def to(self, device_rank):
+        self.device_rank = device_rank
+        if self.order_transform is not None:
+            self.order_transform = self.order_transform.to(device_rank)
+
+        return self
 
     def size(self, dim):
         assert dim < 2, "DistTensorPGAS is 2-dimensional"
