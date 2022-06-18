@@ -55,6 +55,10 @@ class DistTensor:
             all_ends = [item.range.end for item in self.tensor_endpoints]
             all_ends.sort()
             return all_ends[-1]
+    
+    @property
+    def shape(self):
+        return [self.size(0), self.size(1)]
 
     def collect(self, nodes):
         nodes -= self.tensor_endpoints[self.server_rank].range.start

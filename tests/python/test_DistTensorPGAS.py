@@ -9,7 +9,6 @@ import config
 from quiver.shard_tensor import ShardTensorConfig, ShardTensor
 from quiver_feature import TensorEndPoint, Range
 from quiver_feature import DistHelper
-#from tmp import DistTensor as DistTensorPGAS
 from quiver_feature import DistTensorPGAS
 
 
@@ -87,7 +86,7 @@ else:
 dist_helper.sync_end()
 
 pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
-dist_tensor = DistTensorPGAS(DEVICE_RANK, LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], shard_tensor, cached_range)
+dist_tensor = DistTensorPGAS(LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], shard_tensor, cached_range)
 
 start = time.time()
 data = dist_tensor[indices_device]
