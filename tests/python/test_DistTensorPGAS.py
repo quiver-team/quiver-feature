@@ -13,17 +13,13 @@ from quiver_feature import DistTensorPGAS
 
 
 parser = argparse.ArgumentParser(description='')
-parser.add_argument('-rank', type=int, help='rank')
+parser.add_argument('-rank', type=int, default=0, help='rank')
 parser.add_argument('-device', type=int, default=0, help="device idx")
-parser.add_argument('-world_size', type=int, default = 2, help="world size")
-parser.add_argument('-start_server', type=int, default=0, help='whether to start server')
+parser.add_argument('-world_size', type=int, default=1, help="world size")
+parser.add_argument('-start_server', type=int, default=1, help='whether to start server')
 parser.add_argument("-cache_ratio", type=float, default=0.0, help ="how much data you want to cache")
 
 args = parser.parse_args()
-
-
-MASTER_IP = "155.198.152.17"
-HLPER_PORT = 5678
 
 NUM_ELEMENT = 1000000
 FEATURE_DIM = 600
@@ -58,7 +54,7 @@ for idx in range(WORLD_SIZE):
     range_list.append(range_item)
 
 
-dist_helper = DistHelper(MASTER_IP, HLPER_PORT, WORLD_SIZE, LOCAL_SERVER_RANK)
+dist_helper = DistHelper(config.MASTER_IP, config.HLPER_PORT, WORLD_SIZE, LOCAL_SERVER_RANK)
 tensor_endpoints_list: List[TensorEndPoint] = dist_helper.exchange_tensor_endpoints_info(range_list[LOCAL_SERVER_RANK])
 
 print(f"Check All TensorEndPoints {tensor_endpoints_list}")

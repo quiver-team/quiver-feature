@@ -83,7 +83,7 @@ class DistTensor:
 
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
-        feature = torch.empty(nodes.shape[0], self.local_tensor_pgas.shape[1], device = nodes.device)
+        feature = torch.empty(nodes.shape[0], self.shape[1], device = nodes.device)
 
         cache_nodes_mask = None
         local_nodes_mask = None
