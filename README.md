@@ -3,18 +3,19 @@ Quiver-Feature is a high performance component for distributed feature collectio
 
 # Install
 
-## Pip Install
-1. Install the Quiver pip package [from here](https://github.com/quiver-team/torch-quiver).
 
-2. Install Quiver-Feature pip package
-
-        pip install quiver-feature 
 
 ## Install From Source
+1. Install the Quiver pip package [from here](https://github.com/quiver-team/torch-quiver).
+
+2. Install Quiver-Feature from source
 
         git clone git@github.com:quiver-team/quiver-feature.
         pip install .
 
+## Pip Install
+
+Comming soon....
 
 We have tested Quiver with the following setup:
 
