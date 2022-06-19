@@ -1,8 +1,10 @@
 # Quiver-Feature
 Quiver-Feature is a high performance component for distributed feature collections for GNN training on extreme large graphs. It has **5-10x throughput performance** compared with current solutions in different GNN systems, such as DGL, PyG, GraphLearn.
 
-# Install
+`DistTensorPGAS` is the key component Quiver-Feature provides. It place graph feature data across devices(CPU DRAM, GPU HBM) and machines, trying to take full advantage of the multi-tier GPU-centric storage layers. During training, `DistTensorPGAS` uses **UVA** for local data access and **RDMA read** for remote data access, achieving zero-copy and CPU/kernel bypass.
 
+
+# Install
 
 
 ## Install From Source
@@ -41,6 +43,8 @@ We have tested Quiver with the following setup:
         Buffer Registeration Done! Ready To Receive Connections, Start Your Clients Now
        
 
-
 # Core Ideas
 
+## Data Placement
+
+## Zero-Copy Data Access
