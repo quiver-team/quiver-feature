@@ -9,22 +9,17 @@ import config
 from quiver.shard_tensor import ShardTensorConfig, ShardTensor
 from quiver_feature import TensorEndPoint, Range
 from quiver_feature import DistHelper
-#from tmp import DistTensor as DistTensorPGAS
 from quiver_feature import DistTensorPGAS
 
 
 parser = argparse.ArgumentParser(description='')
-parser.add_argument('-rank', type=int, help='rank')
+parser.add_argument('-rank', type=int, default=0, help='rank')
 parser.add_argument('-device', type=int, default=0, help="device idx")
-parser.add_argument('-world_size', type=int, default = 2, help="world size")
-parser.add_argument('-start_server', type=int, default=0, help='whether to start server')
+parser.add_argument('-world_size', type=int, default=1, help="world size")
+parser.add_argument('-start_server', type=int, default=1, help='whether to start server')
 parser.add_argument("-cache_ratio", type=float, default=0.0, help ="how much data you want to cache")
 
 args = parser.parse_args()
-
-
-MASTER_IP = "155.198.152.17"
-HLPER_PORT = 5678
 
 NUM_ELEMENT = 1000000
 FEATURE_DIM = 600
@@ -59,7 +54,7 @@ for idx in range(WORLD_SIZE):
     range_list.append(range_item)
 
 
-dist_helper = DistHelper(MASTER_IP, HLPER_PORT, WORLD_SIZE, LOCAL_SERVER_RANK)
+dist_helper = DistHelper(config.MASTER_IP, config.HLPER_PORT, WORLD_SIZE, LOCAL_SERVER_RANK)
 tensor_endpoints_list: List[TensorEndPoint] = dist_helper.exchange_tensor_endpoints_info(range_list[LOCAL_SERVER_RANK])
 
 print(f"Check All TensorEndPoints {tensor_endpoints_list}")
@@ -87,7 +82,7 @@ else:
 dist_helper.sync_end()
 
 pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
-dist_tensor = DistTensorPGAS(DEVICE_RANK, LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], shard_tensor, cached_range)
+dist_tensor = DistTensorPGAS(LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], shard_tensor, cached_range)
 
 start = time.time()
 data = dist_tensor[indices_device]

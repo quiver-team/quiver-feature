@@ -1,4 +1,5 @@
 import torch
+from . import multiprocessing
 from .dist_tensor_rpc import DistTensorRPC
 from .common import Range, TensorEndPoint
 from .dist_tensor_pgas import DistTensor as DistTensorPGAS

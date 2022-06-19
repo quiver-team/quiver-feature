@@ -15,7 +15,11 @@ void register_TensorEndPoint(pybind11::module& m) {
 void register_ComEndPoint(pybind11::module& m) {
   // define ComEndPoint
   py::class_<qvf::ComEndPoint>(m, "ComEndPoint")
-      .def(py::init<int, std::string, int>());
+      .def(py::init<int, std::string, int>())
+      .def(py::init<>())
+      .def("rank", &qvf::ComEndPoint::get_rank, py::call_guard<py::gil_scoped_release>())
+      .def("address", &qvf::ComEndPoint::get_address, py::call_guard<py::gil_scoped_release>())
+      .def("port", &qvf::ComEndPoint::get_port, py::call_guard<py::gil_scoped_release>());
 }
 
 void register_DistTensorServer(pybind11::module& m) {
@@ -30,7 +34,11 @@ void register_DistTensorServer(pybind11::module& m) {
 
 void register_PipeParam(pybind11::module& m) {
   py::class_<qvf::PipeParam>(m, "PipeParam")
-      .def(py::init<int, int, int, int>());
+      .def(py::init<int, int, int, int>())
+      .def(py::init<>())
+      .def("get_param_vec", &qvf::PipeParam::get_param_vec, py::call_guard<py::gil_scoped_release>())
+      .def("set_param_vec", &qvf::PipeParam::set_param_vec, py::call_guard<py::gil_scoped_release>())
+      ;
 }
 
 void register_DistTensorClient(pybind11::module& m) {

@@ -134,6 +134,8 @@ infinity_realease/
 
 examples/reddit/processed/
 examples/reddit/raw/
+tests/data/
+
 .idea/*
 cmake-build-debug/
 
