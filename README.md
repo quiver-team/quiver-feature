@@ -29,25 +29,9 @@ We have tested Quiver with the following setup:
 1. You can download Quiver-Feature's examples to test installation:
 
         git clone git@github.com:quiver-team/quiver-feature.git
-        cd quiver-feature/tests/python
+        cd quiver-feature/examples/reddit
 
-2. Start your feature server, and wait for data registeration to complete.
+2. Start your E2E training using command `python3 distribute_training.py -server_world_size [x] -server_rank [x] -device_per_node [x]`. Here `server_world_size` stands for how many machines you are using. `device_per_node` stands for how many training process you are starting on a single machine. `server_rank` stands for server's rank in server world. Remember to set `MASTER_IP` correctly in `config.py` when you start multi-machine training so that all servers can communicate with each other.
 
-    
-        python3 test_DistTensorServer.py
-       
-    Wait for logs like:
+# Core Ideas
 
-        Buffer Registeration Done! Ready To Receive Connections Start Your Clients Now
-
-3. Start your feature client:
-        
-        python3 test_DistTensorClient.py
-
-    A successful run should contain the following line:
-
-
-        Before Collect, Check RegisteredTensor Shape  torch.Size([xxx, xxx])
-        Using TLB Optimization
-        Begin To Check Result...
-        Result Check Passed!, Throughput = xxxxx MB/s
