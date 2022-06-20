@@ -20,8 +20,7 @@ import time
 ######################
 import quiver
 from quiver_feature import DistHelper, Range
-from quiver_feature import DistTensorPGAS, LocalTensorPGAS
-import qvf
+from quiver_feature import DistTensorPGAS, LocalTensorPGAS, DistTensorServer, PipeParam
 
 import config
 
@@ -168,7 +167,7 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
 
 
 def server_thread(world_size, tensor, dist_helper):
-    dist_tensor_server = qvf.DistTensorServer(config.PORT_NUMBER, world_size, config.QP_NUM)
+    dist_tensor_server = DistTensorServer(config.PORT_NUMBER, world_size, config.QP_NUM)
     dist_tensor_server.serve_tensor(tensor)
     dist_helper.sync_start()
     dist_tensor_server.join()
@@ -230,7 +229,7 @@ if __name__ == '__main__':
 
     print(f"[Server_Rank]: {args.server_rank}:\tBegin To Create DistTensorPGAS")
     buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor_pgas.shape[1]]
-    pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
+    pipe_param = PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
     dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints, pipe_param, buffer_shape, local_tensor_pgas, cached_range)
 
 
