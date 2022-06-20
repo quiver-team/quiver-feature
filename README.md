@@ -1,11 +1,26 @@
-# Quiver-Feature
-Quiver-Feature is a high performance component for distributed feature collections for GNN training on extreme large graphs. It has **5-10x throughput performance** compared with current solutions in different GNN systems, such as DGL, PyG, GraphLearn.
+[pypi-image]: https://badge.fury.io/py/torch-geometric.svg
+[pypi-url]: https://pypi.org/project/quiver-feature/
 
-`DistTensorPGAS` is the key component Quiver-Feature provides. It place graph feature data across devices(CPU DRAM, GPU HBM) and machines, trying to take full advantage of the multi-tier GPU-centric storage layers. During training, `DistTensorPGAS` uses **UVA** for local data access and **RDMA read** for remote data access, achieving zero-copy and CPU/kernel bypass.
+<p align="center">
+  <img height="150" src="https://github.com/quiver-team/torch-quiver/blob/main/docs/multi_medias/imgs/quiver-logo-min.png" />
+</p>
+
+--------------------------------------------------------------------------------
+
+Quiver-Feature is a high performance component for **distributed feature collection** for **training GNN models on extreme large graphs**. 
+
+1. It has neat ideas about **feature data placement** and **data access method** across devices and machines. 
+
+2. **It has great performance**, **5-10x throughput performance** compared with current feature collection solutions in existing GNN systems, such as DGL, PyG. 
+
+3. **It is very easy to use**, so you can easily integrate Quiver-Feature as a component in your GNN training pipeline to speedup your time-consuming feature collection step when training GNN models on extreme large graphs.
+
+--------------------------------------------------------------------------------
+
+`DistTensorPGAS` is the key component Quiver-Feature provides. It places graph feature across devices(CPU DRAM, GPU HBM) and machines, trying to take full advantage of the multi-tier GPU-centric storage layers. During training, `DistTensorPGAS` uses **UVA** for local data access and **RDMA read** for remote data access, achieving E2E zero-copy and CPU/kernel bypass.
 
 
 # Install
-
 
 ## Install From Source
 1. Install the Quiver pip package [from here](https://github.com/quiver-team/torch-quiver).
