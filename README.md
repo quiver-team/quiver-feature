@@ -7,16 +7,22 @@
 
 --------------------------------------------------------------------------------
 
-Quiver-Feature is a high performance component for **distributed feature collection** for **training GNN models on extreme large graphs**. 
+Quiver-Feature is a high performance component for **distributed feature collection** for **training GNN models on extreme large graphs**, It is build on [Quiver](https://github.com/quiver-team/torch-quiver) and RDMA network and has several novel features:
 
-1. It has neat ideas about **feature data placement** and **data access method** across devices and machines. 
+1. **High Performance**: Quiver-Feature has **5-10x throughput performance** over feature collection solutions in existing GNN systems such as DGL and PyG. 
 
-2. **It has great performance**, **5-10x throughput performance** compared with current feature collection solutions in existing GNN systems, such as DGL, PyG. 
+2. **Maximum Hardware Resource Utilization Efficiency**: Quiver-Feature has minimum CPU usage and minimum memory bus traffic. Leaving much of the CPU and memory resource to graph sampling task and model training task.
 
-3. **It is very easy to use**, so you can easily integrate Quiver-Feature as a component in your GNN training pipeline to speedup your time-consuming feature collection step when training GNN models on extreme large graphs.
+3. **Easy to use**: To use Quiver-Feature, developers only need to add a few lines of code in existing PyG programs. Quiver-Feature is thus easy to be adopted by PyG users and deployed in production clusters.
 
 --------------------------------------------------------------------------------
+# Motivation 
+<!--Challenge -->
+GNN models are small and can be computed very fast on GPUs, but training GNN models on large graphs are often unbareable long due to the time-consuming feature collection step. For each iteration, GNN model may consume hundreds of MBs, even serveral GBs of feature data, making it very challenging to move these data across network, system memory and PCIe. **Because of the large data size, we get punished for every extra memory copy**. 
 
+![train_gnn_models_on_large_graph](docs/imgs/train_gnn_on_large_graphs.png)
+
+<!--Current Systems -->
 `DistTensorPGAS` is the key component Quiver-Feature provides. It places graph feature across devices(CPU DRAM, GPU HBM) and machines, trying to take full advantage of the multi-tier GPU-centric storage layers. During training, `DistTensorPGAS` uses **UVA** for local data access and **RDMA read** for remote data access, achieving E2E zero-copy and CPU/kernel bypass.
 
 
