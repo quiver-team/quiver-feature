@@ -141,9 +141,9 @@ Quiver-Feature is licensed under the Apache License, Version 2.0
 # Citation
 If you use Quiver-Feature in your publication,please cite it by using the following BibTeX entry.
 
-@Misc{Quiver-Feature,
-  institution = {Quiver Team},
-  title =  {Quiver-Feature:A High Performance Feature Collection Component For Distributed GNN Model Training},
-  howpublished = {\url{https://github.com/quiver-team/quiver-feature}},
-  year = {2022}
-}
+        @Misc{Quiver-Feature,
+        institution = {Quiver Team},
+        title =  {Quiver-Feature:A High Performance Feature Collection Component For Distributed GNN Model Training},
+        howpublished = {\url{https://github.com/quiver-team/quiver-feature}},
+        year = {2022}
+        }
