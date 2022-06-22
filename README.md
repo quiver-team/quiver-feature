@@ -170,4 +170,4 @@ If you use Quiver-Feature in your publication,please cite it by using the follow
         title =  {Quiver-Feature:A High Performance Feature Collection Component For Distributed GNN Model Training},
         howpublished = {\url{https://github.com/quiver-team/quiver-feature}},
         year = {2022}
-}
+    }
