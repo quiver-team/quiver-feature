@@ -42,13 +42,13 @@ These 4 memory spaces have connections with each other using PCIe, NVLink and RD
 
 
 
-**Zero-Copy data access method** Feature collection in GNN training involves massive data movement across network, DRAM, PCIe and NVLink and any extra memory copy hurts the e2e performance. Quiver-Feature use `UVA` for local memory spaces access(Local HBM, Local DRAM, Neighbor HBM) and use `RDMA READ` for remote memory space access(Remote DRAM), avoiding extra memory copy.
+**Zero-Copy data access method** Feature collection in GNN training involves massive data movement across network, DRAM, PCIe and NVLink and any extra memory copy hurts the e2e performance. Quiver-Feature use `UVA` for local memory spaces access(Local HBM, Local DRAM, Neighbor HBM) and use `RDMA READ` for remote memory space access(Remote DRAM), avoiding extra memory copy.([You can refer to this doc for our RDMA details](docs/rdma_details.md))
 
 **Unified Distributed Tensor Abstraction** Above these memory spaces, Quiver-Feature adopts `Partitioned Global Address Space` and implements a 2-dimensional distributed tensor abstraction which is called `DistTensorPGAS`. Users can use `DistTensorPGAS` just like a torch.Tensor, querying `shape`, `size` and do `slicing operation`.
 
 ![pgas_tensor](docs/imgs/pgas_tensor_view.png)
 
-Feature collection during GNN training is actually a slicing operation on `DistTensorPGAS` which needs to access data from local memory spaces and remote memory spces. `DistTensorPGAS` use `UVA` for local access and RDMA read for remote access, achieving e2e zero-copy and minimum CPU intervention.
+Feature collection during GNN training is actually a slicing operation on `DistTensorPGAS` which needs to access data from local memory spaces and remote memory spces. `DistTensorPGAS` use `UVA` for local access and `RDMA READ` for remote access, achieving e2e zero-copy and minimum CPU intervention.([You can refer to this doc for our RDMA details](docs/rdma_details.md))
 
 ![feature_collection_operation](docs/imgs/pgas_tensor_access.png)
 
