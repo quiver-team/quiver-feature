@@ -9,7 +9,7 @@
 
 Quiver-Feature is a high performance component for **distributed feature collection** for **training GNN models on extreme large graphs**, It is built on [Quiver](https://github.com/quiver-team/torch-quiver) and RDMA and has several novel features:
 
-1. **High Performance**: Quiver-Feature has **5-10x throughput performance** over feature collection solutions in existing GNN systems such as DGL and PyG. 
+1. **High Performance**: Quiver-Feature has **5-10x throughput performance** over feature collection solutions in existing GNN systems such as [DGL](https://github.com/dmlc/dgl) and [PyG](https://github.com/pyg-team/pytorch_geometric). 
 
 2. **Maximum Hardware Resource Utilization Efficiency**: Quiver-Feature has minimum CPU usage and minimum memory bus traffic. Leaving much of the CPU and memory resource to graph sampling task and model training task.
 
@@ -36,19 +36,19 @@ Quiver-Feature is a high performance component for **distributed feature collect
 
 ![memory_view](docs/imgs/consistent_memory_view.png)
 
-These 4 memory spaces have connections with each other using PCIe, NVLink or RDMA etc. Accessing different memory spaces from a certain GPU has unbalanced performance. Considering that feature data access frequency during GNN training is also unbalanced, Quiver-Feature combines them and takes full advantage of the GPU-centric multi-level memories spaces.
+These 4 memory spaces have connections with each other using PCIe, NVLink and RDMA etc. Accessing different memory spaces from a certain GPU has unbalanced performance(as show below). Considering that feature data access frequency during GNN training is also unbalanced, Quiver-Feature combines them and takes full advantage of the GPU-centric multi-level memories spaces.
 
 ![memory_view](docs/imgs/gpu0_centered_access_performance.png)
 
 
 
-**Zero-Copy data access method** Feature collection in GNN training involves massive data movement across network, DRAM, PCIe and NVLink and any extra memory copy hurts the e2e performance. Quiver-Feature use UVA for local memory spaces access(Local HBM, Local DRAM, Neighbor HBM) and use RDMA read for remote memory space access(Remote DRAM), avoiding extra memory copy.
+**Zero-Copy data access method** Feature collection in GNN training involves massive data movement across network, DRAM, PCIe and NVLink and any extra memory copy hurts the e2e performance. Quiver-Feature use `UVA` for local memory spaces access(Local HBM, Local DRAM, Neighbor HBM) and use `RDMA READ` for remote memory space access(Remote DRAM), avoiding extra memory copy.
 
 **Unified Distributed Tensor Abstraction** Above these memory spaces, Quiver-Feature adopts `Partitioned Global Address Space` and implements a 2-dimensional distributed tensor abstraction which is called `DistTensorPGAS`. Users can use `DistTensorPGAS` just like a torch.Tensor, querying `shape`, `size` and do `slicing operation`.
 
 ![pgas_tensor](docs/imgs/pgas_tensor_view.png)
 
-Feature collection during GNN training is actually a slicing operation on `DistTensorPGAS` which needs to access data from local memory spaces and remote memory spces. `DistTensorPGAS` use UVA for local access and RDMA read for remote access, achieving e2e zero-copy and minimum CPU intervention.
+Feature collection during GNN training is actually a slicing operation on `DistTensorPGAS` which needs to access data from local memory spaces and remote memory spces. `DistTensorPGAS` use `UVA` for local access and RDMA read for remote access, achieving e2e zero-copy and minimum CPU intervention.
 
 ![feature_collection_operation](docs/imgs/pgas_tensor_access.png)
 
@@ -68,8 +68,8 @@ We have 2 machines and 100Gbps IB networks between them. We partition the data u
 
 2. Install Quiver-Feature from source
 
-        $ git clone git@github.com:quiver-team/$ quiver-feature.
-        $ pip install .
+        $ git clone git@github.com:quiver-team/quiver-feature
+        $ pip install
 
 ## Pip Install
 
@@ -127,6 +127,7 @@ Here is a simple example for using Quiver-Feature in a PyG's program. You can ch
                 ...
 
     if __name__ == "__main__":
+
         # Step 1: Load Local data partition
         local_tensor, cached_range, local_range = load_partitioned_data(...)
 
@@ -140,21 +141,19 @@ Here is a simple example for using Quiver-Feature in a PyG's program. You can ch
         server = threading.Thread(target=server_thread)
         server.start()
 
-
-        # Step 4:  Build DistTensorPGAS from local feature partition
         ...
-
+        # Step 4:  Build DistTensorPGAS from local feature partition
         dist_tensor = DistTensorPGAS(...)
 
 
         # Step 5: Spawn Training Processes Using DistTensor as Parameter
-
         mp.spawn(
                 train_process,
                 args=(..., dist_tensor, ...),
                 nprocs=args.device_per_node,
                 join=True
         )
+        ...
 
 ```
 
