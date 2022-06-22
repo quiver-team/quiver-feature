@@ -2,7 +2,7 @@
 
 This doc will mainly describe how we use RDMA for remote data access and summarize techniques we use to get the best RDMA performance. 
 
-Before we start, we would like to show our appreciation to @claudebarthels for developing [infinity](https://github.com/claudebarthels/infinity) which is a lightweight C++ RDMA library for IB and is also the code base for our RDMA implementation.
+Before we start, we would like to show our appreciation to [@claudebarthels](https://github.com/claudebarthels) for developing [infinity](https://github.com/claudebarthels/infinity) which is a lightweight C++ RDMA library for IB and is also the code base for our RDMA implementation.
 
 
 ## Use RDMA READ for Feature Collection
@@ -23,7 +23,7 @@ Feature collection invloves millions of small `RDMA READs`(each `READ` may read 
 RDMA hosts use Queue Pair(QP) to communicate with each other. Nowadays, RNICs contains a pool of processing units(PUs) and we believe that requests in the same QP is always processed by the same PU to avoid cross-PU synchronization. But CPU is much powerful than a PU so if we only use one QP per RDMA client, the performance can be easily bottlenecked by the PU's ability. So we use multi QPs per RDMA client and dispatch READ requests evenly to these QPs to take full advantage of RNIC's parallel processing ability.
 
 
-### Rule 2: Sample A Few Requests to Set as Signaled
+### Rule 2: Only Set A Subset Of All Requests as Signaled
 
 Each RDMA read request can be set as signaled or unsignaled. <!--A CQE(Completion Query Entry) will be put into CQ(Completion Queue) if a signaled read request is completed and CPU can poll from CQ to check the status of this request.-->Signaled requests need CPU intervention but users can check result status by polling CQs(Completion Queue). Unsignaled requests dont involve CPU, but users have to decide their own way to check if these requests are completed successfully.
 
@@ -33,16 +33,13 @@ Like we said before, each batch's feature collection involves millions of `RDMA 
 
 `max_rd_atomic` is a crucial QP attribute for performance, it is the number of RDMA Reads & atomic operations outstanding at any time that can be handled by a RC QP as an initiator. We suggest you set it as RNIC's `max_qp_rd_atom` which you can get by calling `ibv_query_device()`. You can refer to [our code](https://github.com/quiver-team/quiver-feature/blob/main/csrc/include/infinity/queues/QueuePair.cpp#L38) to see how to set this attribute.
 
-## Reducing Address Translation Overhead
+## Reduce Address Translation Overhead
 
 RNIC uses DMA to access system memory, since DMA can only handle physical addresses, the memory region which is exposed to RNIC must be registered so that RNIC stores virtual-to-physical mapping of this memory region in its MTT(Memory Translation Table). MTT is stored in system memory but RNIC's SRAM will cache some. Every time RNIC receive a RDMA read/write requests, it will first translate user's virtual address to physical address by looking up it's MTT cache, if the cache is missed, it will send requsts through PCIe to check this mapping in system memory which may bring severe overhead and thus cause RDMA performance degradation.
 
 ![rdma_mtt](imgs/rdma_mtt.png)
 
 To reduce this address translation overhead, we choose to sort our requested node ids before sending RDMA requests to increase memory accessing locality so that RNIC's cache could get higher hit rate.
-
-Above 4 techniques we use help us get nearly the best RDMA performance.
-
 
 
 
