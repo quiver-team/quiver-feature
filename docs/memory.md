@@ -14,9 +14,11 @@ On each machine:
 Pinning memory doesnt consume extra memory but moving a torch.Tensor to SHM will cause 
 2x the peak memory of the original data size.
 
-To solve this problem, we implement `quiver_feature.shared_load` to replace the original `torch.load`. `quiver_feature.shared_load` is almost the same as `torch.load` except that it loads data directly into SHM. So the peak memory during creating `DistTensorPGAS` will be around the original data size, **half of that when using torch.load**.
+To solve this problem, we implement `quiver_feature.shared_load` to replace the original `torch.load`. **`quiver_feature.shared_load` is almost the same as `torch.load` except that it loads data directly into SHM**. So the peak memory during creating `DistTensorPGAS` using `quiver_feature.shared_load` will just be around the original data size, **half of that when using torch.load**.
 
 ![shared_load](imgs/shared_load.png)
+
+![peak_memory](imgs/peak_memory_footprint.png)
 
 You can check our [test script](../tests/python/test_SharedLoader.py) for more details.
 
