@@ -2,25 +2,18 @@ import torch
 from torch_geometric.datasets import Reddit
 import os.path as osp
 import time
-import ogb
 from ogb.nodeproppred import PygNodePropPredDataset
-import quiver
-from quiver_feature import LocalTensorPGAS
 
 import argparse
 
 import numpy as np
 import time
-import threading
 from typing import List
-import qvf
 import config
-import quiver
 import torch.multiprocessing as mp
-from quiver_feature import TensorEndPoint, Range
+from quiver_feature import TensorEndPoint, Range, PipeParam, DistTensorServerParam, DistTensorDeviceParam
 from quiver_feature import DistHelper
-#from tmp import DistTensor as DistTensorPGAS
-from quiver_feature import DistTensorPGAS, LocalTensorPGAS
+from quiver_feature import DistTensorPGAS
 
 
 def load_products():
@@ -108,35 +101,26 @@ if __name__ == "__main__":
         range_item = Range(cached_range.end + UNCACHED_NUM_ELEMENT * idx, cached_range.end + UNCACHED_NUM_ELEMENT * (idx + 1))
         range_list.append(range_item)
 
-    # Build local_tensor_pgas
+    # Build local_tensor
     local_tensor = torch.cat([tensor[cached_range.start: cached_range.end], tensor[range_list[args.server_rank].start: range_list[args.server_rank].end]]).share_memory_()
-    local_tensor_pgas = LocalTensorPGAS(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="device_replicate")
-    local_tensor_pgas.from_cpu_tensor(local_tensor)
 
     # Exchange information with each other
     dist_helper = DistHelper(config.MASTER_IP, config.HLPER_PORT, SERVER_WORLD_SIZE, LOCAL_SERVER_RANK)
     tensor_endpoints_list: List[TensorEndPoint] = dist_helper.exchange_tensor_endpoints_info(range_list[LOCAL_SERVER_RANK])
 
-    # Start server thread
-    def server_thread(dist_helper):
-        dist_tensor_server = qvf.DistTensorServer(config.PORT_NUMBER, SERVER_WORLD_SIZE * args.device_per_node, config.QP_NUM)
-        dist_tensor_server.serve_tensor(tensor)
-        dist_helper.sync_start()
-        dist_tensor_server.join()
-    x = threading.Thread(target=server_thread, args=(dist_helper, ))
-    x.daemon = True
-    x.start()
-
-    # Wait all servers start
-    dist_helper.sync_end()
-
     print(f"Check All TensorEndPoints {tensor_endpoints_list}")
     whole_tensor = torch.cat([tensor[:cached_range.end, ]] + [tensor[cached_range.end:, ]] * SERVER_WORLD_SIZE)
 
-    pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
+    device_param = DistTensorDeviceParam(device_list=list(range(args.device_per_node)), device_cache_size="4G", cache_policy="device_replicate")
+    server_param = DistTensorServerParam(port_num=config.PORT_NUMBER, server_world_size=args.server_world_size)
+    buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor.shape[1]]
+    pipe_param = PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
-    dist_tensor = DistTensorPGAS(LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, local_tensor_pgas.shape[1]], local_tensor_pgas, cached_range)
+    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints_list, pipe_param, buffer_shape, cached_range)
+    dist_tensor.from_cpu_tensor(local_tensor, dist_helper=dist_helper, server_param=server_param, device_param=device_param)
 
+    
+    
     mp.spawn(feature_process, nprocs=args.device_per_node, args=(dist_tensor, whole_tensor, SAMPLE_SIZE), join=True)
 
     dist_helper.sync_all()

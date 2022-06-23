@@ -102,15 +102,13 @@ A successful run should contain the following line:
 
 # Quick Start
 
-To use Quiver-Feature, you need to replace PyG's feature tensor with `quiver_feature.DistTensorPGAS`,this usually requires only a few changes in existing PyG programs with following 5 steps on each machine:
+To use Quiver-Feature, you need to replace PyG's feature tensor with `quiver_feature.DistTensorPGAS`,this usually requires only a few changes in existing PyG programs with following 4 steps on each machine:
 
 - Load feature partition and meta data which belongs to the current machine.
 
-- Start a `quiver_feature.DistTensorServer` for serving current machine's feature partition.
+- Exchange feature partition meta data with other processes using `quiver_feature.DistHelper`.
 
-- Exchange feature partition meta data using `quiver_feature.DistHelper`.
-
-- Build a `quiver_feature.DistTensorPGAS` from local feature partition and meta data.
+- Create a `quiver_feature.DistTensorPGAS` from local feature partition and meta data.
 
 - Pass the `quiver_feature.DistTensorPGAS` built above as parameter to each training process for feature collection.
 
@@ -122,7 +120,7 @@ Here is a simple example for using Quiver-Feature in a PyG's program. You can ch
         ...
         for batch_size, n_id, adjs in train_loader:
                 ...
-                # Using DistTensorPGAS for feature collection.
+                # Using DistTensorPGAS Just Like A torch.Tensor
                 collected_feature = dist_tensor[n_id]
                 ...
 
@@ -131,22 +129,16 @@ Here is a simple example for using Quiver-Feature in a PyG's program. You can ch
         # Step 1: Load Local data partition
         local_tensor, cached_range, local_range = load_partitioned_data(...)
 
-        # Create DistHelper for information exchange and cross-process synchronization
-        dist_helper = DistHelper(...)
-
         # Step 2: Exchange TensorPoints Information
+        dist_helper = DistHelper(...)
         tensor_endpoints = dist_helper.exchange_tensor_endpoints_info()
-        
-        # Step 3: Start Feature Server
-        server = threading.Thread(target=server_thread)
-        server.start()
 
-        ...
-        # Step 4:  Build DistTensorPGAS from local feature partition
+        
+        # Step 3:  Build DistTensorPGAS from local feature partition
         dist_tensor = DistTensorPGAS(...)
 
 
-        # Step 5: Spawn Training Processes Using DistTensor as Parameter
+        # Step 4: Spawn Training Processes Using DistTensor as Parameter
         mp.spawn(
                 train_process,
                 args=(..., dist_tensor, ...),

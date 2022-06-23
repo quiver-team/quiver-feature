@@ -1,73 +1,70 @@
 import torch
 import quiver_feature
+import psutil
+import time
+from multiprocessing import Process
+import os
 
+def measure_process(parent_process_id):
+    consumed = 0
+    start = time.time()
+    mem_use_lst = []
+
+    while consumed < 20:
+        mem_use = psutil.Process(parent_process_id).memory_info().rss / 1024 / 1024
+        time.sleep(0.0001)
+        consumed += time.time() - start
+        start = time.time()
+        mem_use_lst.append(mem_use)
+    
+    print(f"Max Memory Usage: {max(mem_use_lst)}")
 
 def check_shared(t: torch.Tensor):
-    print('tensor.is_shared() = '.format(t.is_shared()))
-
-
-def test_shared():
-    print('Create a normal Tensor')
-    a = torch.zeros((10, 10))
-    check_shared(a)
-
-    print('Call share_memory_()')
-    a.share_memory_()
-    check_shared(a)
-
-    print('Save this Tensor with torch.save()')
-    torch.save(a, 'a.pt')
-    print('Check after saved:')
-    check_shared(a)
-
-    print('Load the tensor from disk with torch.load')
-
-    b = torch.load('a.pt')
-    check_shared(b)
-
-    print('Load the tensor from disk with quiver_feature.load_shared_tensor')
-    c = quiver_feature.shared_load('a.pt')
-    check_shared(c)
-
-    print('Try save three tensors:')
-    torch.save((a, b, c), 'abc.pt')
-
-    d, e, f = quiver_feature.shared_load('abc.pt')
-    print('Check each tensor is shared:')
-    for t in [d, e, f]:
-        check_shared(t)
-
+    print('tensor.is_shared() = {}'.format(t.is_shared()))
 
 def save_huge_tensor():
     a = torch.zeros((10, 1024, 1024, 256))
-
     torch.save(a, 'huge.pt')
-
-
-import gc
-
 
 def torch_load_huge_shared_tensor():
     a = torch.load('huge.pt')
+    print(f"Original Data Size = {a.numel() * 4  / 1024 / 1024} MB")
+    
+    print(f"Before Shared:", end="\t")
+    check_shared(a)
+    
     a.share_memory_()
-    input()
+
+    print(f"After Shared:", end="\t")
+    check_shared(a)
+    
+    del a 
 
 
 def qvf_load_huge_shared_tensor():
     a = quiver_feature.shared_load('huge.pt')
-    input()
+    print(f"Original Data Size = {a.numel() * 4  / 1024 / 1024} MB")
+    
+    print(f"Before Shared:", end="\t")
+    check_shared(a)
 
+    a.share_memory_()
+
+    print(f"After Shared:", end="\t")
+    check_shared(a)
+
+    del a
 
 if __name__ == '__main__':
-    # save_huge_tensor()
+    #save_huge_tensor()
 
-    input()
-    print('s1')
-    torch_load_huge_shared_tensor()
+    sub_process = Process(target=measure_process, args=(os.getpid(),))
+    sub_process.start()
 
-    gc.collect()
+    # Test Pytorch's Data Loading
+    #torch_load_huge_shared_tensor()
 
-    print('s2')
+    # Test Quiver-Feature's SharedLoader
     qvf_load_huge_shared_tensor()
 
-# ps -ef | grep 'python tests/python/test_ShareLoader.py' | grep -v grep | grep "${xzl}" | awk '{print $2}'
+    sub_process.join()

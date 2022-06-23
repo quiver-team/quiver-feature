@@ -2,7 +2,6 @@ import torch
 from torch_geometric.datasets import Reddit
 import os.path as osp
 import time
-import ogb
 from ogb.nodeproppred import PygNodePropPredDataset
 import quiver
 from quiver_feature import LocalTensorPGAS
@@ -50,7 +49,7 @@ def test_LocalTensorPGAS(dataset="reddit", device_nums = 1, device_cache_size = 
     else:
         dataset = load_products()
 
-    local_tensor_pgas = LocalTensorPGAS(0, device_list=list(range(device_nums)), device_cache_size=device_cache_size, cache_policy=cache_policy)
+    local_tensor_pgas = LocalTensorPGAS(device_list=list(range(device_nums)), device_cache_size=device_cache_size, cache_policy=cache_policy)
     local_tensor_pgas.from_cpu_tensor(tensor)
 
     indices = torch.randint(0, tensor.shape[0],(SAMPLE_NUM,), device="cuda:0")
@@ -72,6 +71,6 @@ def test_LocalTensorPGAS(dataset="reddit", device_nums = 1, device_cache_size = 
 
 
 if __name__ == "__main__":
-    quiver.init_p2p([0, 1, 2, 3])
+    quiver.init_p2p([0, 1])
     #test_normal_feature_collect()
-    test_LocalTensorPGAS(device_cache_size="110M", device_nums=2, cache_policy="p2p_clique_replicate")
+    test_LocalTensorPGAS(device_cache_size="110M", device_nums=1, cache_policy="device_replicate")

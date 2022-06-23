@@ -18,10 +18,12 @@ import time
 ######################
 # Import From Quiver
 ######################
-import quiver
-from quiver_feature import DistHelper, Range
-from quiver_feature import DistTensorPGAS, LocalTensorPGAS, DistTensorServer, PipeParam
+from quiver_feature import DistHelper, Range, DistTensorServerParam, DistTensorDeviceParam
+from quiver_feature import DistTensorPGAS, serve_tensor_for_remote_access, PipeParam
 
+######################
+# Import Config File
+######################
 import config
 
 class SAGE(torch.nn.Module):
@@ -166,12 +168,6 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
     dist.destroy_process_group()
 
 
-def server_thread(world_size, tensor, dist_helper):
-    dist_tensor_server = DistTensorServer(config.PORT_NUMBER, world_size, config.QP_NUM)
-    dist_tensor_server.serve_tensor(tensor)
-    dist_helper.sync_start()
-    dist_tensor_server.join()
-
 def load_partitioned_data(args, data, node_count):
     """
     Return local data partition, cache information and local tensor range information
@@ -187,7 +183,7 @@ def load_partitioned_data(args, data, node_count):
         range_list.append(range_item)
 
     local_tensor = torch.cat([data.x[: cached_range.end], data.x[range_list[args.server_rank].start: range_list[args.server_rank].end]]).pin_memory()
-
+    local_tensor.share_memory_()
     return local_tensor, cached_range, range_list[args.server_rank]
 
 if __name__ == '__main__':
@@ -211,31 +207,24 @@ if __name__ == '__main__':
 
     print("Exchange TensorPoints Information")
     dist_helper = DistHelper(config.MASTER_IP, config.HLPER_PORT, args.server_world_size, args.server_rank)
-
     tensor_endpoints = dist_helper.exchange_tensor_endpoints_info(local_range)
-    print(f"Starting Server With: {tensor_endpoints}")
-    # Start Feature Server
-    server = threading.Thread(target=server_thread, args=(args.server_world_size * args.device_per_node, local_tensor, dist_helper))
-    server.daemon = True
-    server.start()
-
-    print(f"Waiting All Servers To Start")
-    # Wait to sync
-    dist_helper.sync_end()
-
-    local_tensor_pgas = LocalTensorPGAS(rank=0, device_list=list(range(args.device_per_node)), device_cache_size="55M", cache_policy="device_replicate")
-    local_tensor_pgas.from_cpu_tensor(local_tensor)
-    data_split = (data.train_mask, data.val_mask, data.test_mask)
-
+  
     print(f"[Server_Rank]: {args.server_rank}:\tBegin To Create DistTensorPGAS")
-    buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor_pgas.shape[1]]
+    device_param = DistTensorDeviceParam(device_list=list(range(args.device_per_node)), device_cache_size="55M", cache_policy="device_replicate")
+    server_param = DistTensorServerParam(port_num=config.PORT_NUMBER, server_world_size=args.server_world_size)
+    buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor.shape[1]]
     pipe_param = PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
-    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints, pipe_param, buffer_shape, local_tensor_pgas, cached_range)
+
+    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints, pipe_param, buffer_shape, cached_range)
+    dist_tensor.from_cpu_tensor(local_tensor, dist_helper=dist_helper, server_param=server_param, device_param=device_param)
+
 
 
     print(f"Begin To Spawn Training Processes")
     world_size = args.device_per_node * args.server_world_size
     process_rank_base = args.device_per_node * args.server_rank
+    data_split = (data.train_mask, data.val_mask, data.test_mask)
+
     mp.spawn(
         run,
         args=(process_rank_base, world_size, data_split, data.edge_index, dist_tensor, data.y, dataset.num_features, dataset.num_classes),

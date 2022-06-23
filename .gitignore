@@ -141,3 +141,5 @@ cmake-build-debug/
 
 # OSX
 .DS_Store
+
+*.pt

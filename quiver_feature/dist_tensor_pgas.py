@@ -1,11 +1,13 @@
 import torch
 import qvf
 from typing import List
-from .common import Range, TensorEndPoint
+from .common import Range, TensorEndPoint, DistTensorServerParam, DistTensorDeviceParam
+from .dist_helper import DistHelper
 from .local_tensor_pgas import LocalTensorPGAS
+from .utils import serve_tensor_for_remote_access
 
 class DistTensor:
-    def __init__(self, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, local_tensor_pgas: LocalTensorPGAS, cached_range: Range= Range(start=0, end=0), order_transform:torch.Tensor=None)-> None:
+    def __init__(self, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, cached_range: Range= Range(start=0, end=0), order_transform:torch.Tensor=None)-> None:
 
         # About DistTensorClient
         self.server_rank = server_rank
@@ -19,7 +21,7 @@ class DistTensor:
         self.inited = False
 
         # About ShardTensor
-        self.local_tensor_pgas = local_tensor_pgas
+        self.local_tensor_pgas = None
         self.cached_range = cached_range
         self.device_rank = -1
         self.order_transform = order_transform
@@ -39,6 +41,21 @@ class DistTensor:
         if self.order_transform is not None:
             self.order_transform = self.order_transform.to(self.device_rank)
 
+
+    def from_cpu_tensor(self, cpu_tensor, dist_helper:DistHelper, server_param:DistTensorServerParam= None, device_param:DistTensorDeviceParam=None):
+
+        server_param: DistTensorServerParam = server_param or DistTensorServerParam()
+        device_param: DistTensorDeviceParam = device_param or DistTensorDeviceParam()
+
+        cpu_tensor.share_memory_()
+
+        # Start Server
+        serve_tensor_for_remote_access(server_param.port_num, self.pipe_param.get_param_vec()[0], server_param.server_world_size, server_param.device_per_server, cpu_tensor, dist_helper)
+
+        # Build Local Tensor
+        self.local_tensor_pgas = LocalTensorPGAS(device_param.device_list, device_param.device_cache_size, device_param.cache_policy)
+        self.local_tensor_pgas.from_cpu_tensor(cpu_tensor)
+        
 
     def to(self, device_rank):
         self.device_rank = device_rank
