@@ -1,17 +1,12 @@
 import argparse
-from ntpath import join
 import torch
 import numpy as np
 import time
-import threading
 from typing import List
-import qvf
 import config
-import quiver
 import torch.multiprocessing as mp
 from quiver_feature import TensorEndPoint, Range, PipeParam, DistTensorDeviceParam, DistTensorServerParam
 from quiver_feature import DistHelper
-#from tmp import DistTensor as DistTensorPGAS
 from quiver_feature import DistTensorPGAS
 
 NUM_ELEMENT = 1000000
@@ -104,7 +99,7 @@ if __name__ == "__main__":
 
     dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints_list, pipe_param, buffer_shape, cached_range)
     dist_tensor.from_cpu_tensor(tensor, dist_helper=dist_helper, server_param=server_param, device_param=device_param)
-    
+
 
     mp.spawn(feature_process, nprocs=args.device_per_node, args=(dist_tensor, whole_tensor, SAMPLE_SIZE), join=True)
 
