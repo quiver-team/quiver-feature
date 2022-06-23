@@ -19,8 +19,7 @@ import quiver
 import torch.multiprocessing as mp
 from quiver_feature import TensorEndPoint, Range
 from quiver_feature import DistHelper
-#from tmp import DistTensor as DistTensorPGAS
-from quiver_feature import DistTensorPGAS, LocalTensorPGAS
+from quiver_feature import DistTensorPGAS
 
 
 def load_products():
@@ -108,10 +107,8 @@ if __name__ == "__main__":
         range_item = Range(cached_range.end + UNCACHED_NUM_ELEMENT * idx, cached_range.end + UNCACHED_NUM_ELEMENT * (idx + 1))
         range_list.append(range_item)
 
-    # Build local_tensor_pgas
+    # Build local_tensor
     local_tensor = torch.cat([tensor[cached_range.start: cached_range.end], tensor[range_list[args.server_rank].start: range_list[args.server_rank].end]]).share_memory_()
-    local_tensor_pgas = LocalTensorPGAS(0, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="device_replicate")
-    local_tensor_pgas.from_cpu_tensor(local_tensor)
 
     # Exchange information with each other
     dist_helper = DistHelper(config.MASTER_IP, config.HLPER_PORT, SERVER_WORLD_SIZE, LOCAL_SERVER_RANK)
@@ -135,8 +132,8 @@ if __name__ == "__main__":
 
     pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
-    dist_tensor = DistTensorPGAS(LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, local_tensor_pgas.shape[1]], local_tensor_pgas, cached_range)
-
+    dist_tensor = DistTensorPGAS(LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, whole_tensor.shape[1]], cached_range)
+    dist_tensor.from_cpu_tensor(local_tensor, device_list=list(range(args.device_per_node)), device_cache_size="8G", cache_policy="device_replicate")
     mp.spawn(feature_process, nprocs=args.device_per_node, args=(dist_tensor, whole_tensor, SAMPLE_SIZE), join=True)
 
     dist_helper.sync_all()

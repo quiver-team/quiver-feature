@@ -18,10 +18,12 @@ import time
 ######################
 # Import From Quiver
 ######################
-import quiver
 from quiver_feature import DistHelper, Range
 from quiver_feature import DistTensorPGAS, LocalTensorPGAS, DistTensorServer, PipeParam
 
+######################
+# Import Config File
+######################
 import config
 
 class SAGE(torch.nn.Module):
@@ -187,7 +189,7 @@ def load_partitioned_data(args, data, node_count):
         range_list.append(range_item)
 
     local_tensor = torch.cat([data.x[: cached_range.end], data.x[range_list[args.server_rank].start: range_list[args.server_rank].end]]).pin_memory()
-
+    local_tensor.share_memory_()
     return local_tensor, cached_range, range_list[args.server_rank]
 
 if __name__ == '__main__':
@@ -223,14 +225,14 @@ if __name__ == '__main__':
     # Wait to sync
     dist_helper.sync_end()
 
-    local_tensor_pgas = LocalTensorPGAS(rank=0, device_list=list(range(args.device_per_node)), device_cache_size="55M", cache_policy="device_replicate")
-    local_tensor_pgas.from_cpu_tensor(local_tensor)
     data_split = (data.train_mask, data.val_mask, data.test_mask)
 
     print(f"[Server_Rank]: {args.server_rank}:\tBegin To Create DistTensorPGAS")
-    buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor_pgas.shape[1]]
+    buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor.shape[1]]
     pipe_param = PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
-    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints, pipe_param, buffer_shape, local_tensor_pgas, cached_range)
+    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints, pipe_param, buffer_shape, cached_range)
+    dist_tensor.from_cpu_tensor(local_tensor, device_list=list(range(args.device_per_node)), device_cache_size="55M", cache_policy="device_replicate")
+
 
 
     print(f"Begin To Spawn Training Processes")

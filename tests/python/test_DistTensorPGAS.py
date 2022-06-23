@@ -40,12 +40,8 @@ UNCACHED_NUM_ELEMENT = (NUM_ELEMENT * WORLD_SIZE - cached_range.end) // WORLD_SI
 host_tensor = np.arange((UNCACHED_NUM_ELEMENT + cached_range.end ) * FEATURE_DIM)
 host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEATURE_DIM)
 
-tensor = torch.from_numpy(host_tensor).type(torch.float32)
+tensor = torch.from_numpy(host_tensor).type(torch.float32).share_memory_()
 
-
-shard_tensor_config = ShardTensorConfig({DEVICE_RANK: "8G"})
-shard_tensor = ShardTensor(DEVICE_RANK, shard_tensor_config)
-shard_tensor.from_cpu_tensor(tensor)
 
 
 range_list = []
@@ -82,7 +78,8 @@ else:
 dist_helper.sync_end()
 
 pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
-dist_tensor = DistTensorPGAS(LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], shard_tensor, cached_range)
+dist_tensor = DistTensorPGAS(LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], cached_range)
+dist_tensor.from_cpu_tensor(tensor, device_list=[DEVICE_RANK], device_cache_size="8G", cache_policy="device_replicate")
 
 start = time.time()
 data = dist_tensor[indices_device]

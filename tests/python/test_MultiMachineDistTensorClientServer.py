@@ -7,12 +7,10 @@ import threading
 from typing import List
 import qvf
 import config
-import quiver
 import torch.multiprocessing as mp
 from quiver_feature import TensorEndPoint, Range
 from quiver_feature import DistHelper
-#from tmp import DistTensor as DistTensorPGAS
-from quiver_feature import DistTensorPGAS, LocalTensorPGAS
+from quiver_feature import DistTensorPGAS
 
 MASTER_IP = "155.198.152.17"
 HLPER_PORT = 5678

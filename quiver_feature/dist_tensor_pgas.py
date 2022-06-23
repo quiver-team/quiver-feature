@@ -5,7 +5,7 @@ from .common import Range, TensorEndPoint
 from .local_tensor_pgas import LocalTensorPGAS
 
 class DistTensor:
-    def __init__(self, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, local_tensor_pgas: LocalTensorPGAS, cached_range: Range= Range(start=0, end=0), order_transform:torch.Tensor=None)-> None:
+    def __init__(self, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, cached_range: Range= Range(start=0, end=0), order_transform:torch.Tensor=None)-> None:
 
         # About DistTensorClient
         self.server_rank = server_rank
@@ -19,7 +19,7 @@ class DistTensor:
         self.inited = False
 
         # About ShardTensor
-        self.local_tensor_pgas = local_tensor_pgas
+        self.local_tensor_pgas = None
         self.cached_range = cached_range
         self.device_rank = -1
         self.order_transform = order_transform
@@ -39,6 +39,17 @@ class DistTensor:
         if self.order_transform is not None:
             self.order_transform = self.order_transform.to(self.device_rank)
 
+
+    def from_cpu_tensor(self, cpu_tensor, device_list=[], device_cache_size=0, cache_policy="device_replicate"):
+        """
+        Args:
+            device_list ([int]): device list for data placement
+            device_cache_size (Union[int, str]): cache data size for each device, can be like `0.9M` or `3GB`
+            cache_policy (str, optional): cache_policy for hot data, can be `device_replicate` or `p2p_clique_replicate`, choose `p2p_clique_replicate` when you have NVLinks between GPUs, else choose `device_replicate`. (default: `device_replicate`)
+        """
+        self.local_tensor_pgas = LocalTensorPGAS(device_list, device_cache_size, cache_policy)
+        self.local_tensor_pgas.from_cpu_tensor(cpu_tensor)
+        
 
     def to(self, device_rank):
         self.device_rank = device_rank
