@@ -7,7 +7,15 @@ Before we start, we would like to show our appreciation to [@claudebarthels](htt
 
 ## Use RDMA READ for Feature Collection
 
-As we mentioned in the [REAMDE](../README.md), `quiver_feature.DistTensorPGAS` is a 2-dimension distributed tensor abstraction above different memory spaces using `PGAS` model(Partitioned Global Address Space) and **`quiver_feature.DistTensorPGAS` is splitted by row and is placed on different machines**. When we want to access a certain row of `quiver_feature.DistTensorPGAS`, **we can compute the target machine's index and the memory offset of this row on that target machine from row index**. Since each row's data size can be known in advance, **we can use one single `RDMA READ` to fetch this wanted row's data(which corresponds to a single node's feature)**.
+As we mentioned in the [REAMDE](../README.md), `quiver_feature.DistTensorPGAS` is a 2-dimension distributed tensor abstraction above different memory spaces using `PGAS` model(Partitioned Global Address Space) and **`quiver_feature.DistTensorPGAS` is partitioned by row onto different machines**. 
+![memory_view](imgs/pgas_tensor_view.png)
+
+By default, we use `range partition`, when we want to access a certain row of `quiver_feature.DistTensorPGAS`, **we can compute the target machine's index and the memory offset of this row on that target machine from row index**.
+
+![range_partition](imgs/range_partition.png)
+
+
+ Since each row's data size can be known in advance, **we can use one single `RDMA READ` to fetch this wanted row's data(which corresponds to a single node's feature)**.
 
 ![memory_view](imgs/pgas_tensor_view.png)
 
@@ -16,11 +24,13 @@ So **each batch's feature collection involves millons of `RDMA READ`**, each `RE
 ![feature_collection](imgs/one_batch_feature_collection.png)
 
 ## 4 Techniques We Use
-Feature collection invloves millions of small `RDMA READs`(each `READ` may read just 2KB data), and we use these 3 techniques to get the best performance.
+Feature collection invloves millions of small `RDMA READs`(each `READ` may read just 2KB data), and we use these 4 techniques to get the best performance.
 
 ### Rule 1: Use Multi QPs Per Client
 
 RDMA hosts use Queue Pair(QP) to communicate with each other. Nowadays, RNICs contains a pool of processing units(PUs) and we believe that requests in the same QP is always processed by the same PU to avoid cross-PU synchronization. But CPU is much powerful than a PU so if we only use one QP per RDMA client, the performance can be easily bottlenecked by the PU's ability. So we use multi QPs per RDMA client and dispatch READ requests evenly to these QPs to take full advantage of RNIC's parallel processing ability.
+
+![multi_qp](imgs/multi_qp.png)
 
 
 ### Rule 2: Only Set A Subset Of All Requests as Signaled
@@ -28,6 +38,9 @@ RDMA hosts use Queue Pair(QP) to communicate with each other. Nowadays, RNICs co
 Each RDMA read request can be set as signaled or unsignaled. <!--A CQE(Completion Query Entry) will be put into CQ(Completion Queue) if a signaled read request is completed and CPU can poll from CQ to check the status of this request.-->Signaled requests need CPU intervention but users can check result status by polling CQs(Completion Queue). Unsignaled requests dont involve CPU, but users have to decide their own way to check if these requests are completed successfully.
 
 Like we said before, each batch's feature collection involves millions of `RDMA READ` requests. For each QP, we sequentially send these requests but only set one request out of `CQ_MOD`(which we often set as 128) requests as signaled, i.e. we only set 1/128 of all requests as signaled and check their result status. We also set the last request as signaled and wait until its completion to make sure that all requests in this QP are completed. If these signaled requests' result status are all succefful, we think all requests are completed sucessfully.
+
+![subset_signaled](imgs/subset_signaled_requests.png)
+
 
 ## Set QP's max_rd_atomic as the RNIC's max_qp_rd_atom
 
