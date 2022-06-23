@@ -18,8 +18,8 @@ import time
 ######################
 # Import From Quiver
 ######################
-from quiver_feature import DistHelper, Range
-from quiver_feature import DistTensorPGAS, LocalTensorPGAS, DistTensorServer, PipeParam
+from quiver_feature import DistHelper, Range, DistTensorServerParam, DistTensorDeviceParam
+from quiver_feature import DistTensorPGAS, serve_tensor_for_remote_access, PipeParam
 
 ######################
 # Import Config File
@@ -168,12 +168,6 @@ def run(rank, process_rank_base, world_size, data_split, edge_index, dist_tensor
     dist.destroy_process_group()
 
 
-def server_thread(world_size, tensor, dist_helper):
-    dist_tensor_server = DistTensorServer(config.PORT_NUMBER, world_size, config.QP_NUM)
-    dist_tensor_server.serve_tensor(tensor)
-    dist_helper.sync_start()
-    dist_tensor_server.join()
-
 def load_partitioned_data(args, data, node_count):
     """
     Return local data partition, cache information and local tensor range information
@@ -217,13 +211,8 @@ if __name__ == '__main__':
     tensor_endpoints = dist_helper.exchange_tensor_endpoints_info(local_range)
     print(f"Starting Server With: {tensor_endpoints}")
     # Start Feature Server
-    server = threading.Thread(target=server_thread, args=(args.server_world_size * args.device_per_node, local_tensor, dist_helper))
-    server.daemon = True
-    server.start()
-
-    print(f"Waiting All Servers To Start")
-    # Wait to sync
-    dist_helper.sync_end()
+    serve_tensor_for_remote_access(config.PORT_NUMBER, config.QP_NUM, args.server_world_size, args.device_per_node, local_tensor, dist_helper)
+  
 
     data_split = (data.train_mask, data.val_mask, data.test_mask)
 
