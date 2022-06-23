@@ -207,26 +207,24 @@ if __name__ == '__main__':
 
     print("Exchange TensorPoints Information")
     dist_helper = DistHelper(config.MASTER_IP, config.HLPER_PORT, args.server_world_size, args.server_rank)
-
     tensor_endpoints = dist_helper.exchange_tensor_endpoints_info(local_range)
-    print(f"Starting Server With: {tensor_endpoints}")
-    # Start Feature Server
-    serve_tensor_for_remote_access(config.PORT_NUMBER, config.QP_NUM, args.server_world_size, args.device_per_node, local_tensor, dist_helper)
   
-
-    data_split = (data.train_mask, data.val_mask, data.test_mask)
-
     print(f"[Server_Rank]: {args.server_rank}:\tBegin To Create DistTensorPGAS")
+    device_param = DistTensorDeviceParam(device_list=list(range(args.device_per_node)), device_cache_size="55M", cache_policy="device_replicate")
+    server_param = DistTensorServerParam(port_num=config.PORT_NUMBER, server_world_size=args.server_world_size)
     buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor.shape[1]]
     pipe_param = PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
+
     dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints, pipe_param, buffer_shape, cached_range)
-    dist_tensor.from_cpu_tensor(local_tensor, device_list=list(range(args.device_per_node)), device_cache_size="55M", cache_policy="device_replicate")
+    dist_tensor.from_cpu_tensor(local_tensor, dist_helper=dist_helper, server_param=server_param, device_param=device_param)
 
 
 
     print(f"Begin To Spawn Training Processes")
     world_size = args.device_per_node * args.server_world_size
     process_rank_base = args.device_per_node * args.server_rank
+    data_split = (data.train_mask, data.val_mask, data.test_mask)
+
     mp.spawn(
         run,
         args=(process_rank_base, world_size, data_split, data.edge_index, dist_tensor, data.y, dataset.num_features, dataset.num_classes),

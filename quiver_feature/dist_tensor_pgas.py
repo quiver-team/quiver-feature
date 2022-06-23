@@ -48,9 +48,9 @@ class DistTensor:
         device_param: DistTensorDeviceParam = device_param or DistTensorDeviceParam()
 
         cpu_tensor.share_memory_()
-        
+
         # Start Server
-        serve_tensor_for_remote_access(server_param.port_num, self.pipe_param.get_param_vec()[0], server_param.server_world_size, server_param.device_per_serve, cpu_tensor, dist_helper)
+        serve_tensor_for_remote_access(server_param.port_num, self.pipe_param.get_param_vec()[0], server_param.server_world_size, server_param.device_per_server, cpu_tensor, dist_helper)
 
         # Build Local Tensor
         self.local_tensor_pgas = LocalTensorPGAS(device_param.device_list, device_param.device_cache_size, device_param.cache_policy)

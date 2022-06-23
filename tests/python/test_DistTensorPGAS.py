@@ -2,15 +2,11 @@ import argparse
 import torch
 import numpy as np
 import time
-import threading
 from typing import List
-import qvf
 import config
-from quiver.shard_tensor import ShardTensorConfig, ShardTensor
-from quiver_feature import TensorEndPoint, Range
+from quiver_feature import TensorEndPoint, Range, DistTensorDeviceParam, DistTensorServerParam, PipeParam
 from quiver_feature import DistHelper
 from quiver_feature import DistTensorPGAS
-
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('-rank', type=int, default=0, help='rank')
@@ -60,26 +56,14 @@ indices = torch.from_numpy(host_indice).type(torch.long)
 indices_device = indices.to(DEVICE_RANK)
 whole_tensor = torch.cat([tensor[:cached_range.end, ]] + [tensor[cached_range.end:, ]] * WORLD_SIZE)
 
-def server_thread(dist_helper):
-    dist_tensor_server = qvf.DistTensorServer(config.PORT_NUMBER, WORLD_SIZE, config.QP_NUM)
-    dist_tensor_server.serve_tensor(tensor)
-    dist_helper.sync_start()
-    dist_tensor_server.join()
+device_param = DistTensorDeviceParam(device_list=[DEVICE_RANK], device_cache_size="8G", cache_policy="device_replicate")
+server_param = DistTensorServerParam(port_num=config.PORT_NUMBER, server_world_size= WORLD_SIZE)
+buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, tensor.shape[1]]
+pipe_param = PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
-if START_SERVER:
-    # Start server thread
-    x = threading.Thread(target=server_thread, args=(dist_helper, ))
-    x.daemon = True
-    x.start()
+dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints_list, pipe_param, buffer_shape, cached_range)
+dist_tensor.from_cpu_tensor(tensor, dist_helper=dist_helper, server_param=server_param, device_param=device_param)
 
-else:
-    dist_helper.sync_start()
-
-dist_helper.sync_end()
-
-pipe_param = qvf.PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
-dist_tensor = DistTensorPGAS(LOCAL_SERVER_RANK, tensor_endpoints_list, pipe_param, [SAMPLE_SIZE, FEATURE_DIM], cached_range)
-dist_tensor.from_cpu_tensor(tensor, device_list=[DEVICE_RANK], device_cache_size="8G", cache_policy="device_replicate")
 
 start = time.time()
 data = dist_tensor[indices_device]
