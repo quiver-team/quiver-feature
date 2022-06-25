@@ -2,9 +2,9 @@
 
 This doc will mainly describe feature partition methods we use in `Quiver-Feature`. 
 
-# Meta Data Of Each Partition
+# Metadata Of Each Partition
 
-Default meta data for each partition is `TensorEndPoint` which records `Range` information of each serverßß.
+Default metadata for each partition is `TensorEndPoint` which records `Range` information of each serverßß.
 
 ```python
 Range = namedtuple("Range", ["start", "end"])
