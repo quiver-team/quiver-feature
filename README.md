@@ -7,7 +7,7 @@
 
 --------------------------------------------------------------------------------
 
-Quiver-Feature is a RDMA-based high performance **distributed feature collection component** for **training GNN models on extreme large graphs**, It is built on [Quiver](https://github.com/quiver-team/torch-quiver) and has several novel features:
+Quiver-Feature is a RDMA-based high performance **distributed feature collection component** for **training GNN models on extremely large graphs**, It is built on [Quiver](https://github.com/quiver-team/torch-quiver) and has several novel features:
 
 1. **High Performance**: Quiver-Feature has **5-10x throughput performance** over feature collection solutions in existing GNN systems such as [DGL](https://github.com/dmlc/dgl) and [PyG](https://github.com/pyg-team/pytorch_geometric). 
 
@@ -19,38 +19,22 @@ Quiver-Feature is a RDMA-based high performance **distributed feature collection
 
 --------------------------------------------------------------------------------
 
-# Core Ideas
+# GPU-centric Data Placement And Zero-Copy Data Access
 
-**GPU-centric data placement** and **Zero-Copy data access method** are two keys behind Quiver-Feature's high performance. 
+**`GPU-centric data placement`** and **`Zero-Copy data access method`** are two keys behind Quiver-Feature's high performance. 
 
-**GPU-centric data placement:** Quiver-Feature has a unified view of memories across devices and machines. It classifies these memories into 4 memory spaces under a GPU-centric view:
-
-- Local HBM: Local HBM is the memory space belongs to current GPU and has the best memory bandwidth(~600GB/s).
-
-- Neighbor HBM: Neighbor HBMs are memories which belong to neighbor GPUs connecting with current GPU with NVLink.
-
-- Local DRAM: Local DRAM is the CPU memory which belongs to current machine.
-
-- Remote DRAM: Remote DRAM is CPU memory which belong to other machines.
-
+**`GPU-Centric Data Placement`:** Quiver-Feature has a unified view of memories across devices and machines. It classifies these memories into 4 memory spaces under a GPU-centric view: **Local HBM**(Current GPU's Memory),**Neighbor HBM**, **Local DRAM**(Current machines's CPU memory) and **Remote DRAM**(Remote CPU's memory). These 4 memory spaces have connections with each other using PCIe, NVLink and RDMA etc.
 
 ![memory_view](docs/imgs/consistent_memory_view.png)
 
-These 4 memory spaces have connections with each other using PCIe, NVLink and RDMA etc. Accessing different memory spaces from a certain GPU has unbalanced performance(as show below). Considering that feature data access frequency during GNN training is also unbalanced, Quiver-Feature using application-aware and device topology aware data palcement algorithm to takes full advantage of the GPU-centric multi-level memories spaces.
+Accessing different memory spaces from GPU has unbalanced performance. Considering that feature data access frequency during GNN training is also unbalanced, Quiver-Feature uses **`application-aware and device GPU-Centric data palcement algorithm`** to takes full advantage of the GPU-centric multi-level memory layers.
 
-![memory_view](docs/imgs/gpu0_centered_access_performance.png)
+**Zero-Copy Data Access:** Feature collection in GNN training involves massive data movement across network, DRAM, PCIe and NVLink and any extra memory copy hurts the e2e performance. Quiver-Feature uses one-sided commnunication methods such as `UVA` for local memory spaces access(Local HBM, Local DRAM, Neighbor HBM) and `RDMA READ` for remote memory space access(Remote DRAM), achiving zero-copy and minimum CPU intervention.([You can refer to this document for more RDMA details](docs/rdma_details.md))
 
 
-
-**Zero-Copy data access method** Feature collection in GNN training involves massive data movement across network, DRAM, PCIe and NVLink and any extra memory copy hurts the e2e performance. Quiver-Feature use `UVA` for local memory spaces access(Local HBM, Local DRAM, Neighbor HBM) and use `RDMA READ` for remote memory space access(Remote DRAM), achiving zero-copy and minimum CPU intervention.([You can refer to this doc for our RDMA details](docs/rdma_details.md))
-
-**Unified Distributed Tensor Abstraction** Above these memory spaces, Quiver-Feature adopts `Partitioned Global Address Space` and implements a 2-dimension distributed tensor abstraction which is called `DistTensorPGAS`. Users can use `DistTensorPGAS` just like a torch.Tensor, querying `shape`, `size` and do `slicing operation`.
+**DistTensorPGAS:** Above those memory spaces, **Quiver-Feature adopts [`PGAS`](https://en.wikipedia.org/wiki/Partitioned_global_address_space) memory model** and implements a 2-dimension distributed tensor abstraction which is called `DistTensorPGAS`. Users can use `DistTensorPGAS` just like a local torch.Tensor, such as querying `shape` and performing `slicing operation` etc.
 
 ![pgas_tensor](docs/imgs/pgas_tensor_view.png)
-
-Feature collection during GNN training is actually a slicing operation on `DistTensorPGAS` which needs to access data from both local and remote memory spaces. `DistTensorPGAS` use `UVA` for local access and `RDMA READ` for remote access, achieving e2e zero-copy and minimum CPU intervention.([You can refer to this doc for our RDMA details](docs/rdma_details.md))
-
-![feature_collection_operation](docs/imgs/pgas_tensor_access.png)
 
 
 # Performance Benchmark
