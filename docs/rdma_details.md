@@ -37,7 +37,9 @@ RDMA hosts use Queue Pair(QP) to communicate with each other. Nowadays, RNICs co
 
 Each RDMA read request can be set as signaled or unsignaled. <!--A CQE(Completion Query Entry) will be put into CQ(Completion Queue) if a signaled read request is completed and CPU can poll from CQ to check the status of this request.-->Signaled requests need CPU intervention but users can check result status by polling CQs(Completion Queue). Unsignaled requests dont involve CPU, but users have to decide their own way to check if these requests are completed successfully.
 
-Like we said before, each batch's feature collection involves millions of `RDMA READ` requests. For each QP, we sequentially send these requests but only set one request out of `CQ_MOD`(which we often set as 128) requests as signaled, i.e. we only set 1/128 of all requests as signaled and check their result status. We also set the last request as signaled and wait until its completion to make sure that all requests in this QP are completed. If these signaled requests' result status are all succefful, we think all requests are completed sucessfully.
+Like we said before, each batch's feature collection involves millions of `RDMA READ` requests. For each QP, we sequentially send these requests but only set one request out of `CQ_MOD`(which we often set as 128) requests as signaled, i.e. we only set 1/128 of all requests as signaled and check their result status. We also set the last request as signaled and wait until its completion to make sure that all requests in this QP are completed. If these signaled requests' result status are all successful, we think all requests are completed sucessfully.
+
+In the future we may add more mechanisms about failures: If we find a signaled request is failed, we will retry this group of `CQ_MOD` requests again. Even with that, We could not guarantee that all requests are completed successfully.
 
 ![subset_signaled](imgs/subset_signaled_requests.png)
 
