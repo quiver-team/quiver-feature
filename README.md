@@ -27,12 +27,12 @@ Quiver-Feature is a RDMA-based high performance **distributed feature collection
 
 ![memory_view](docs/imgs/consistent_memory_view.png)
 
-Accessing different memory spaces from GPU has unbalanced performance. Considering that feature data access frequency during GNN training is also unbalanced, Quiver-Feature uses an **`application-aware and device GPU-Centric data palcement algorithm`** to takes full advantage of the GPU-centric multi-level memory layers.
+Accessing different memory spaces from GPU has unbalanced performance. Considering that feature data access frequency during GNN training is also unbalanced, Quiver-Feature uses an **`application-aware and GPU-Centric data palcement algorithm`** to takes full advantage of the GPU-centric multi-level memory layers.
 
-**Zero-Copy Data Access:** Feature collection in GNN training involves massive data movement across network, DRAM, PCIe and NVLink and any extra memory copy hurts the e2e performance. Quiver-Feature uses one-sided commnunication methods such as `UVA` for local memory spaces access(Local HBM, Local DRAM, Neighbor HBM) and `RDMA READ` for remote memory space access(Remote DRAM), achiving zero-copy and minimum CPU intervention.([You can refer to this document for more RDMA details](docs/rdma_details.md))
+**`Zero-Copy Data Access`:** Feature collection in GNN training involves massive data movement across network, DRAM, PCIe and NVLink and any extra memory copy hurts the e2e performance. Quiver-Feature uses one-sided commnunication methods such as `UVA` for local memory spaces access(Local HBM, Local DRAM, Neighbor HBM) and `RDMA READ` for remote memory space access(Remote DRAM), achiving zero-copy and minimum CPU intervention.([You can refer to this document for more RDMA details](docs/rdma_details.md))
 
 
-**DistTensorPGAS:** Above those memory spaces, Quiver-Feature adopts **[`PGAS`](https://en.wikipedia.org/wiki/Partitioned_global_address_space) memory model** and implements a 2-dimension distributed tensor abstraction which is called `DistTensorPGAS`. Users can use `DistTensorPGAS` just like a local torch.Tensor, such as querying `shape` and performing `slicing operation` etc.
+**`DistTensorPGAS`:** Above those memory spaces, Quiver-Feature adopts **[`PGAS`](https://en.wikipedia.org/wiki/Partitioned_global_address_space) memory model** and implements a 2-dimension distributed tensor abstraction which is called `DistTensorPGAS`. Users can use `DistTensorPGAS` just like a local torch.Tensor, such as querying `shape` and performing `slicing operation` etc.
 
 ![pgas_tensor](docs/imgs/pgas_tensor_view.png)
 
@@ -48,20 +48,21 @@ We have 2 machines and 100Gbps IB networks between them. We partition the data u
 # Install
 
 ## Install From Source(Recommended For Now)
-1. Install the Quiver pip package [from here](https://github.com/quiver-team/torch-quiver).
+1. Install [Quiver](https://github.com/quiver-team/torch-quiver).
 
 2. Install Quiver-Feature from source
 
         $ git clone git@github.com:quiver-team/quiver-feature
-        $ pip install
+        $ cd quiver-feature/
+        $ pip install .
 
 ## Pip Install
 
-1. Install the [Quiver](https://github.com/quiver-team/torch-quiver).
+1. Install [Quiver](https://github.com/quiver-team/torch-quiver).
 
 2. Install the `Quiver-Feature` pip package.
 
-    $ pip install quiver-feature
+        $ pip install quiver-feature
 
 We have tested Quiver with the following setup:
 
@@ -142,7 +143,7 @@ If you use Quiver-Feature in your publication,please cite it by using the follow
 
     @Misc{Quiver-Feature,
         institution = {Quiver Team},
-        title =  {Quiver-Feature:A High Performance Feature Collection Component For Distributed GNN Model Training},
+        title =  {Quiver-Feature:A High Performance Feature Collection Component For Training GNN On Extremely Large Graphs},
         howpublished = {\url{https://github.com/quiver-team/quiver-feature}},
         year = {2022}
     }
