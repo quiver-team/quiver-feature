@@ -21,7 +21,7 @@ def load_reddit():
     return data.x
 
 def load_mag240_partition():
-    tensor = torch.load("/data/dalong/front_half.pt")
+    tensor = quiver_feature.shared_load("/data/dalong/front_half.pt")
     return tensor
 
 
@@ -34,7 +34,7 @@ def test_normal_feature_collect(dataset="reddit"):
     elif dataset == "mag240m":
         tensor = load_mag240_partition()
     else:
-        dataset = load_products()
+        tensor = load_products()
 
     consumed = 0
     res = None
@@ -56,7 +56,9 @@ def test_LocalTensorPGAS(dataset="reddit", device_nums = 1, device_cache_size = 
 
         tensor = load_mag240_partition()
     else:
-        dataset = load_products()
+        tensor = load_products()
+
+    tensor.share_memory_()
 
     local_tensor_pgas = LocalTensorPGAS(device_list=list(range(device_nums)), device_cache_size=device_cache_size, cache_policy=cache_policy)
     local_tensor_pgas.from_cpu_tensor(tensor)
@@ -80,6 +82,10 @@ def test_LocalTensorPGAS(dataset="reddit", device_nums = 1, device_cache_size = 
 
 
 if __name__ == "__main__":
+    """
+    Set shm size as your whole memory size
+     sudo mount -o remount,size=377G /dev/shm
+    """
     quiver.init_p2p([0, 1])
     #test_normal_feature_collect()
-    test_LocalTensorPGAS("mag240m", device_cache_size="110M", device_nums=1, cache_policy="device_replicate")
+    test_LocalTensorPGAS("mag240m", device_cache_size="30G", device_nums=2, cache_policy="p2p_clique_replicate")

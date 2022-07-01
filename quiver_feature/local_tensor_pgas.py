@@ -55,7 +55,7 @@ class LocalTensorPGAS(object):
         return False
   
     def cal_size(self, cpu_tensor: torch.Tensor, cache_memory_budget: int):
-        element_size = cpu_tensor.shape[1] * 4
+        element_size = cpu_tensor.shape[1] * cpu_tensor.element_size()
         cache_size = cache_memory_budget // element_size
         return cache_size
 
@@ -76,7 +76,7 @@ class LocalTensorPGAS(object):
             cache_memory_budget = parse_size(self.device_cache_size) * len(self.topo.p2pClique2Device[0])
 
         print(
-            f"LOG>>> {min(100, int(100 * cache_memory_budget / cpu_tensor.numel() / 4))}% data cached"
+            f"LOG>>> {min(100, int(100 * cache_memory_budget / cpu_tensor.numel() / cpu_tensor.element_size()))}% data cached"
         )
         cache_part, self.cpu_part = self.partition(cpu_tensor,
                                                    cache_memory_budget)

@@ -15,7 +15,7 @@ from quiver_feature import DistTensorPGAS
 MASTER_IP = "155.198.152.17"
 HLPER_PORT = 5678
 
-NUM_ELEMENT = 100#00000 * 3 * 2 * 2 * 2 * 2
+NUM_ELEMENT = 10000000 * 3 * 2 * 2 * 2 * 2
 FEATURE_DIM = 128
 SAMPLE_SIZE = 250000
 
