@@ -107,21 +107,9 @@ class DistTensorClient {
 
     uint64_t size_in_bytes = float_tensor.element_size() * float_tensor.numel();
 
-    if(float_tensor.element_size() == 2){
-      // Float16
-      tensor_buffer = new infinity::memory::Buffer(
-        context, float_tensor.data_ptr<at::Half>(), size_in_bytes);
-    }
-    else if(float_tensor.element_size() == 4){
-      // Float32
-      tensor_buffer = new infinity::memory::Buffer(
-        context, float_tensor.data_ptr<float>(), size_in_bytes);
-    }else{
-      // Float64
-      tensor_buffer = new infinity::memory::Buffer(
-        context, float_tensor.data_ptr<double>(), size_in_bytes);
-    }
-    
+    tensor_buffer = new infinity::memory::Buffer(
+        context, float_tensor.data_ptr(), size_in_bytes);
+
     tensor_token = tensor_buffer->createRegionToken();
   }
 
@@ -154,7 +142,7 @@ class DistTensorClient {
         "Result Tensor is not created from registered buffer");
 
     pipes[server_rank]->read(tensor_buffer, local_offsets, remote_offsets,
-                             res_tensor.size(1) * 4);
+                             res_tensor.size(1) * res_tensor.element_size());
   }
 
   void collect_inner(CollectionTask collection_task) {
