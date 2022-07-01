@@ -11,6 +11,7 @@
 #include <infinity/queues/QueuePairFactory.h>
 #include <infinity/requests/RequestToken.h>
 #include <torch/extension.h>
+#include <ATen/ATen.h>
 #include <chrono>
 #include <deque>
 #include <thread>
@@ -98,15 +99,29 @@ class DistTensorClient {
                             {tensor_shape[0], tensor_shape[1]}, tensor_option);
   }
 
-  void register_float32_tensor(torch::Tensor& float_tensor) {
+  void register_float_tensor(torch::Tensor& float_tensor) {
     QUIVER_FEATURE_ASSERT(
         float_tensor.dim() == 2,
         "Only support 2-dimensional tensor, But got %d-dimensional tensor\n",
         float_tensor.dim());
-    uint64_t size_in_bytes = 4 * float_tensor.numel();
 
-    tensor_buffer = new infinity::memory::Buffer(
+    uint64_t size_in_bytes = float_tensor.element_size() * float_tensor.numel();
+
+    if(float_tensor.element_size() == 2){
+      // Float16
+      tensor_buffer = new infinity::memory::Buffer(
+        context, float_tensor.data_ptr<at::Half>(), size_in_bytes);
+    }
+    else if(float_tensor.element_size() == 4){
+      // Float32
+      tensor_buffer = new infinity::memory::Buffer(
         context, float_tensor.data_ptr<float>(), size_in_bytes);
+    }else{
+      // Float64
+      tensor_buffer = new infinity::memory::Buffer(
+        context, float_tensor.data_ptr<double>(), size_in_bytes);
+    }
+    
     tensor_token = tensor_buffer->createRegionToken();
   }
 
