@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 import math
-
+import os
 from ogb.lsc import MAG240MDataset, MAG240MEvaluator
 import dgl
 import torch
@@ -81,16 +81,14 @@ class RGAT(nn.Module):
 
 
 class ExternalNodeCollator(dgl.dataloading.NodeCollator):
-    def __init__(self, g, idx, sampler, offset, feats, label):
+    def __init__(self, g, idx, sampler, offset, label):
         super().__init__(g, idx, sampler)
         self.offset = offset
-        self.feats = feats
         self.label = label
 
     def collate(self, items):
         input_nodes, output_nodes, mfgs = super().collate(items)
         # Copy input features
-        mfgs[0].srcdata['x'] = self.feats[input_nodes].type(torch.float32)
         mfgs[-1].dstdata['y'] = torch.LongTensor(self.label[output_nodes - self.offset])
         return input_nodes, output_nodes, mfgs
 
@@ -107,7 +105,7 @@ def train(rank, process_rank_base, world_size, args, dataset, g, feats, paper_of
     device_rank = rank
     process_rank = process_rank_base + rank
 
-    dist.init_process_group('nccl', rank=process_rank, world_size=world_size)
+    torch.distributed.init_process_group('nccl', rank=process_rank, world_size=world_size)
 
     torch.torch.cuda.set_device(device_rank)
 
@@ -119,13 +117,13 @@ def train(rank, process_rank_base, world_size, args, dataset, g, feats, paper_of
     print('Initializing dataloader...')
     sampler = dgl.dataloading.MultiLayerNeighborSampler(config.SAMPLE_PARAM)
 
-    train_collator = ExternalNodeCollator(g, train_idx, sampler, paper_offset, feats, label)
-    valid_collator = ExternalNodeCollator(g, valid_idx, sampler, paper_offset, feats, label)
+    train_collator = ExternalNodeCollator(g, train_idx, sampler, paper_offset, label)
+    valid_collator = ExternalNodeCollator(g, valid_idx, sampler, paper_offset, label)
     # Necessary according to https://yangkky.github.io/2019/07/08/distributed-pytorch-tutorial.html
     train_sampler = torch.utils.data.distributed.DistributedSampler(
-        train_collator.dataset, num_replicas=world_size, rank=proc_id, shuffle=True, drop_last=False)
+        train_collator.dataset, num_replicas=world_size, rank=process_rank, shuffle=True, drop_last=False)
     valid_sampler = torch.utils.data.distributed.DistributedSampler(
-        valid_collator.dataset, num_replicas=world_size, rank=proc_id, shuffle=True, drop_last=False)
+        valid_collator.dataset, num_replicas=world_size, rank=process_rank, shuffle=True, drop_last=False)
 
     train_dataloader = torch.utils.data.DataLoader(
         train_collator.dataset,
@@ -144,12 +142,12 @@ def train(rank, process_rank_base, world_size, args, dataset, g, feats, paper_of
     )
 
     print('Initializing model...')
-    model = RGAT(dataset.num_paper_features, dataset.num_classes, 1024, 5, 2, 4, 0.5, 'paper').to(dev_id)
+    model = RGAT(dataset.num_paper_features, dataset.num_classes, 1024, 5, 2, 4, 0.5, 'paper').to(device_rank)
 
     # convert BN to SyncBatchNorm. see https://pytorch.org/docs/stable/generated/torch.nn.SyncBatchNorm.html
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
-    model = DistributedDataParallel(model, device_ids=[dev_id], output_device=dev_id)
+    model = DistributedDataParallel(model, device_ids=[device_rank], output_device=device_rank)
     opt = torch.optim.Adam(model.parameters(), lr=0.001)
     sched = torch.optim.lr_scheduler.StepLR(opt, step_size=25, gamma=0.25)
 
@@ -163,6 +161,7 @@ def train(rank, process_rank_base, world_size, args, dataset, g, feats, paper_of
         with tqdm.tqdm(train_dataloader) as tq:
             for i, (input_nodes, output_nodes, mfgs) in enumerate(tq):
                 mfgs = [g.to(device_rank) for g in mfgs]
+                mfgs[0].srcdata['x'] = feats[input_nodes].type(torch.float32)
                 x = mfgs[0].srcdata['x']
                 y = mfgs[-1].dstdata['y']
                 y_hat = model(mfgs, x)
@@ -194,9 +193,8 @@ def train(rank, process_rank_base, world_size, args, dataset, g, feats, paper_of
         sched.step()
 
         # process 0 print accuracy and save model
-        if proc_id == 0:
+        if process_rank == 0:
             print('Validation accuracy:', acc)
-
             if best_acc < acc:
                 best_acc = acc
                 print('Updating best model...')
@@ -246,6 +244,7 @@ def test(args, dataset, g, feats, paper_offset):
     for i, (input_nodes, output_nodes, mfgs) in enumerate(tqdm.tqdm(valid_dataloader)):
         with torch.no_grad():
             mfgs = [g.to('cuda') for g in mfgs]
+            mfgs[0].srcdata['x'] = feats[input_nodes].type(torch.float32)
             x = mfgs[0].srcdata['x']
             y = mfgs[-1].dstdata['y']
             y_hat = model(mfgs, x)

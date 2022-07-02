@@ -52,7 +52,7 @@ def feature_process(rank, dist_tensor, whole_tensor, SAMPLE_SIZE):
         assert torch.equal(data.cpu(), whole_tensor[indices]), "Result Check Failed!"
 
 
-    print(f"Result Check Successed! Throughput = {data.numel() * 4 * TEST_COUNT/ 1024 / 1024 / consumed} MB/s")
+    print(f"Result Check Successed! Throughput = {data.numel() * data.element_size() * TEST_COUNT/ 1024 / 1024 / consumed} MB/s")
 
 
 
@@ -72,7 +72,8 @@ if __name__ == "__main__":
 
     host_tensor = np.arange((UNCACHED_NUM_ELEMENT + cached_range.end ) * FEATURE_DIM)
     host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEATURE_DIM)
-    tensor = torch.from_numpy(host_tensor).type(torch.float32).share_memory_()
+    host_tensor = host_tensor.astype(np.float16)
+    tensor = torch.from_numpy(host_tensor)
 
 
     # Decide Range Information

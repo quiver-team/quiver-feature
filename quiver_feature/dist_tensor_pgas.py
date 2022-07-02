@@ -54,7 +54,7 @@ class DistTensor:
     def from_cpu_tensor(self, cpu_tensor, dist_helper:DistHelper, server_param:DistTensorServerParam= None, device_param:DistTensorDeviceParam=None):
 
         self.data_type = cpu_tensor.dtype
-        
+
         server_param: DistTensorServerParam = server_param or DistTensorServerParam()
         device_param: DistTensorDeviceParam = device_param or DistTensorDeviceParam()
 
@@ -111,7 +111,7 @@ class DistTensor:
 
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
-        feature = torch.empty(nodes.shape[0], self.shape[1], device = nodes.device)
+        feature = torch.empty(nodes.shape[0], self.shape[1], device = nodes.device, dtype=self.dtype)
 
         cache_nodes_mask = None
         local_nodes_mask = None
