@@ -15,6 +15,7 @@ import torch.multiprocessing as mp
 import sys
 from torch.nn.parallel import DistributedDataParallel
 from collections import OrderedDict
+import time
 
 ######################
 # Import From Quiver
@@ -157,11 +158,22 @@ def train(rank, process_rank_base, world_size, args, dataset, g, feats, paper_of
         # make shuffling work properly across multiple epochs.
         # see https://pytorch.org/docs/stable/data.html#torch.utils.data.distributed.DistributedSampler
         train_sampler.set_epoch(i)
+        
         model.train()
         with tqdm.tqdm(train_dataloader) as tq:
+            sample_start  = time.time()
+            sample_times = []
+            feature_times = []
+            model_times = []
+            total_nodes = 0
             for i, (input_nodes, output_nodes, mfgs) in enumerate(tq):
+                sample_times.append(time.time() - sample_start)
                 mfgs = [g.to(device_rank) for g in mfgs]
+                feature_start = time.time()
                 mfgs[0].srcdata['x'] = feats[input_nodes].type(torch.float32)
+                feature_times.append(time.time() - feature_start)
+
+                model_start = time.time()
                 x = mfgs[0].srcdata['x']
                 y = mfgs[-1].dstdata['y']
                 y_hat = model(mfgs, x)
@@ -169,8 +181,19 @@ def train(rank, process_rank_base, world_size, args, dataset, g, feats, paper_of
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
+                model_times.append(time.time() - model_start)
                 acc = (y_hat.argmax(1) == y).float().mean()
                 tq.set_postfix({'loss': '%.4f' % loss.item(), 'acc': '%.4f' % acc.item()}, refresh=False)
+                sample_start = time.time()
+                total_nodes += input_nodes.shape[0]
+        
+        avg_sample = np.average(sample_times[1:])
+        avg_feature = np.average(feature_times)
+        avg_model = np.average(model_times)
+
+        if device_rank == 0:
+            print(f"Process_Rank: {process_rank}:\tAvg_Sample: {avg_sample:.4f}, Avg_Feature: {avg_feature:.4f}, Avg_Model: {avg_model:.4f}, Avg_Feature_BandWidth = {(total_nodes * feats.shape[1] * 2 / len(feature_times)/avg_feature/1024/1024):.4f} MB/s")
+
 
         # eval in each process
         model.eval()
@@ -266,6 +289,11 @@ def test(args, dataset, g, feats, paper_offset):
 
 
 if __name__ == '__main__':
+    """
+    Set shm size as your whole memory size
+    sudo mount -o remount,size=377G /dev/shm
+    """
+
     parser = argparse.ArgumentParser()
 
     # Quiver Arguments
