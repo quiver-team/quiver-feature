@@ -304,7 +304,7 @@ if __name__ == '__main__':
     buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, local_tensor.shape[1]]
     pipe_param = PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
-    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints, pipe_param, buffer_shape, cached_range)
+    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints, pipe_param, buffer_shape, dtype=torch.float16)
     dist_tensor.from_cpu_tensor(local_tensor, dist_helper=dist_helper, server_param=server_param, device_param=device_param)
 
     print(f"Begin To Spawn Training Processes")
@@ -313,6 +313,6 @@ if __name__ == '__main__':
 
     paper_offset = dataset.num_authors + dataset.num_institutions
     
-    mp.spawn(train, args=(process_rank_base, world_size, dataset, g, dist_tensor, paper_offset), nprocs=args.device_per_node)
+    mp.spawn(train, args=(process_rank_base, world_size, args, dataset, g, dist_tensor, paper_offset), nprocs=args.device_per_node)
 
     test(args, dataset, g, dist_tensor, paper_offset)
