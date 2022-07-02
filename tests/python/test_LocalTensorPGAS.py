@@ -5,7 +5,7 @@ import time
 from ogb.nodeproppred import PygNodePropPredDataset
 import quiver
 from quiver_feature import LocalTensorPGAS
-
+import quiver_feature
 
 def load_products():
     root = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'products')
@@ -20,6 +20,10 @@ def load_reddit():
     data = dataset[0]
     return data.x
 
+def load_mag240_partition():
+    tensor = quiver_feature.shared_load("/data/dalong/front_half.pt")
+    return tensor
+
 
 TEST_COUNT = 100
 SAMPLE_NUM = 80000
@@ -27,8 +31,10 @@ SAMPLE_NUM = 80000
 def test_normal_feature_collect(dataset="reddit"):
     if dataset == "reddit":
         tensor = load_reddit()
+    elif dataset == "mag240m":
+        tensor = load_mag240_partition()
     else:
-        dataset = load_products()
+        tensor = load_products()
 
     consumed = 0
     res = None
@@ -46,8 +52,13 @@ def test_LocalTensorPGAS(dataset="reddit", device_nums = 1, device_cache_size = 
     print(f"Dataset: {dataset}, Device Num: {device_nums}, Device Cache Size: {device_cache_size}, Cache Policy: {cache_policy}")
     if dataset == "reddit":
         tensor = load_reddit()
+    elif dataset == "mag240m":
+
+        tensor = load_mag240_partition()
     else:
-        dataset = load_products()
+        tensor = load_products()
+
+    tensor.share_memory_()
 
     local_tensor_pgas = LocalTensorPGAS(device_list=list(range(device_nums)), device_cache_size=device_cache_size, cache_policy=cache_policy)
     local_tensor_pgas.from_cpu_tensor(tensor)
@@ -67,10 +78,14 @@ def test_LocalTensorPGAS(dataset="reddit", device_nums = 1, device_cache_size = 
         torch.cuda.synchronize()
         consumed += time.time() - start
 
-    print(f"Throughput = {TEST_COUNT * res.numel() * 4 / consumed / 1024 / 1024 / 1024 :.4f} GB/s")
+    print(f"Throughput = {TEST_COUNT * res.numel() * tensor.element_size() / consumed / 1024 / 1024 / 1024 :.4f} GB/s")
 
 
 if __name__ == "__main__":
+    """
+    Set shm size as your whole memory size
+     sudo mount -o remount,size=377G /dev/shm
+    """
     quiver.init_p2p([0, 1])
     #test_normal_feature_collect()
-    test_LocalTensorPGAS(device_cache_size="110M", device_nums=1, cache_policy="device_replicate")
+    test_LocalTensorPGAS("mag240m", device_cache_size="30G", device_nums=2, cache_policy="p2p_clique_replicate")

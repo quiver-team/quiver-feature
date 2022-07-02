@@ -11,6 +11,7 @@
 #include <infinity/queues/QueuePairFactory.h>
 #include <infinity/requests/RequestToken.h>
 #include <torch/extension.h>
+#include <ATen/ATen.h>
 #include <chrono>
 #include <deque>
 #include <thread>
@@ -98,15 +99,17 @@ class DistTensorClient {
                             {tensor_shape[0], tensor_shape[1]}, tensor_option);
   }
 
-  void register_float32_tensor(torch::Tensor& float_tensor) {
+  void register_float_tensor(torch::Tensor& float_tensor) {
     QUIVER_FEATURE_ASSERT(
         float_tensor.dim() == 2,
         "Only support 2-dimensional tensor, But got %d-dimensional tensor\n",
         float_tensor.dim());
-    uint64_t size_in_bytes = 4 * float_tensor.numel();
+
+    uint64_t size_in_bytes = float_tensor.element_size() * float_tensor.numel();
 
     tensor_buffer = new infinity::memory::Buffer(
-        context, float_tensor.data_ptr<float>(), size_in_bytes);
+        context, float_tensor.data_ptr(), size_in_bytes);
+
     tensor_token = tensor_buffer->createRegionToken();
   }
 
@@ -134,12 +137,12 @@ class DistTensorClient {
                  torch::Tensor& local_offsets,
                  torch::Tensor& remote_offsets) {
     QUIVER_FEATURE_ASSERT(
-        reinterpret_cast<uint64_t>(res_tensor.data_ptr<float>()) ==
+        reinterpret_cast<uint64_t>(res_tensor.data_ptr()) ==
             tensor_buffer->getAddress(),
         "Result Tensor is not created from registered buffer");
 
     pipes[server_rank]->read(tensor_buffer, local_offsets, remote_offsets,
-                             res_tensor.size(1) * 4);
+                             res_tensor.size(1) * res_tensor.element_size());
   }
 
   void collect_inner(CollectionTask collection_task) {

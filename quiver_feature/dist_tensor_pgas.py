@@ -6,8 +6,11 @@ from .dist_helper import DistHelper
 from .local_tensor_pgas import LocalTensorPGAS
 from .utils import serve_tensor_for_remote_access
 
+FloatType = [torch.float32, torch.float64, torch.float16, torch.bfloat16]
+IntType = [torch.uint8, torch.int8, torch.int16, torch.int32, torch.int64]
+
 class DistTensor:
-    def __init__(self, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, cached_range: Range= Range(start=0, end=0), order_transform:torch.Tensor=None)-> None:
+    def __init__(self, server_rank, tensor_endpoints: List[TensorEndPoint], pipe_param: qvf.PipeParam, buffer_tensor_shape, cached_range: Range= Range(start=0, end=0), order_transform:torch.Tensor=None, dtype=torch.float32)-> None:
 
         # About DistTensorClient
         self.server_rank = server_rank
@@ -17,6 +20,8 @@ class DistTensor:
         self.pipe_param = pipe_param
         self.com_endpoints = [qvf.ComEndPoint(item.server_rank, item.ip, item.port) for item in tensor_endpoints]
 
+        self.data_type = dtype
+
         # About Lazy Init
         self.inited = False
 
@@ -25,7 +30,11 @@ class DistTensor:
         self.cached_range = cached_range
         self.device_rank = -1
         self.order_transform = order_transform
-        
+    
+    @property
+    def dtype(self):
+        return self.data_type
+
     def lazy_init(self):
         if self.inited:
             return
@@ -35,14 +44,16 @@ class DistTensor:
 
         # Create DistTensorClient
         self.dist_tensor_client = qvf.DistTensorClient(self.server_rank, self.com_endpoints, self.pipe_param)
-        self.registered_tensor = torch.zeros(self.buffer_tensor_shape).pin_memory()
-        self.dist_tensor_client.register_float32_tensor(self.registered_tensor)
+        self.registered_tensor = torch.zeros(self.buffer_tensor_shape, dtype=self.dtype).pin_memory()
+        self.dist_tensor_client.register_float_tensor(self.registered_tensor)
 
         if self.order_transform is not None:
             self.order_transform = self.order_transform.to(self.device_rank)
 
 
     def from_cpu_tensor(self, cpu_tensor, dist_helper:DistHelper, server_param:DistTensorServerParam= None, device_param:DistTensorDeviceParam=None):
+
+        self.data_type = cpu_tensor.dtype
 
         server_param: DistTensorServerParam = server_param or DistTensorServerParam()
         device_param: DistTensorDeviceParam = device_param or DistTensorDeviceParam()
@@ -88,7 +99,7 @@ class DistTensor:
         return data
 
     def cal_remote_offsets(self, nodes, server_rank):
-        remote_offsets = (nodes - self.tensor_endpoints[server_rank].range.start + self.cached_range.end) * self.buffer_tensor_shape[1] * 4
+        remote_offsets = (nodes - self.tensor_endpoints[server_rank].range.start + self.cached_range.end) * self.buffer_tensor_shape[1] * self.registered_tensor.element_size()
         return remote_offsets
 
     def __getitem__(self, nodes):
@@ -100,7 +111,7 @@ class DistTensor:
 
         input_orders = torch.arange(nodes.size(0), dtype=torch.long, device = nodes.device)
 
-        feature = torch.empty(nodes.shape[0], self.shape[1], device = nodes.device)
+        feature = torch.empty(nodes.shape[0], self.shape[1], device = nodes.device, dtype=self.dtype)
 
         cache_nodes_mask = None
         local_nodes_mask = None
@@ -145,7 +156,7 @@ class DistTensor:
                 request_nodes = torch.masked_select(all_remote_nodes, request_nodes_mask)
                 if request_nodes.shape[0] > 0:
                     local_orders = torch.masked_select(input_orders[:all_remote_nodes.shape[0]], request_nodes_mask)
-                    local_offsets = local_orders * self.registered_tensor.shape[1] * 4
+                    local_offsets = local_orders * self.registered_tensor.shape[1] * self.registered_tensor.element_size()
                     remote_offsets = self.cal_remote_offsets(request_nodes, server_rank)
                     self.dist_tensor_client.sync_read(server_rank, self.registered_tensor, local_offsets.cpu(), remote_offsets.cpu())
 

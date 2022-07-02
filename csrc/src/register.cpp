@@ -47,8 +47,8 @@ void register_DistTensorClient(pybind11::module& m) {
       .def("create_registered_float32_tensor",
            &qvf::DistTensorClient::create_registered_float32_tensor,
            py::call_guard<py::gil_scoped_release>())
-      .def("register_float32_tensor",
-           &qvf::DistTensorClient::register_float32_tensor,
+      .def("register_float_tensor",
+           &qvf::DistTensorClient::register_float_tensor,
            py::call_guard<py::gil_scoped_release>())
       .def("create_registered_float32_tensor_cuda",
            &qvf::DistTensorClient::create_registered_float32_tensor_cuda,

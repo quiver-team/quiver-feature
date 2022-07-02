@@ -16,6 +16,7 @@
 #include <vector>
 
 #include <torch/extension.h>
+#include <ATen/ATen.h>
 
 namespace qvf {
 class DistTensorServer {
@@ -51,9 +52,10 @@ class DistTensorServer {
 
   void serve_tensor(torch::Tensor& data) {
     std::cout << "Registering Buffer, Please Wait..." << std::endl;
-    uint64_t size_in_bytes = data.numel() * 4;
+    uint64_t size_in_bytes = data.numel() * data.element_size();
+    
     feature_buffer = new infinity::memory::Buffer(
-        context, data.data_ptr<float>(), size_in_bytes);
+        context, data.data_ptr(), size_in_bytes);
     bufferToken = feature_buffer->createRegionToken();
     server_thread = std::thread(run, qpFactory, bufferToken,
                                 qp_per_pipe * (world_size - 1));

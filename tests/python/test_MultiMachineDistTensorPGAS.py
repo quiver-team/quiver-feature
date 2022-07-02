@@ -52,7 +52,7 @@ def feature_process(rank, dist_tensor, whole_tensor, SAMPLE_SIZE):
         assert torch.equal(data.cpu(), whole_tensor[indices]), "Result Check Failed!"
 
 
-    print(f"Result Check Successed! Throughput = {data.numel() * 4 * TEST_COUNT/ 1024 / 1024 / consumed} MB/s")
+    print(f"Result Check Successed! Throughput = {data.numel() * data.element_size() * TEST_COUNT/ 1024 / 1024 / consumed} MB/s")
 
 
 
@@ -72,7 +72,8 @@ if __name__ == "__main__":
 
     host_tensor = np.arange((UNCACHED_NUM_ELEMENT + cached_range.end ) * FEATURE_DIM)
     host_tensor = host_tensor.reshape((UNCACHED_NUM_ELEMENT + cached_range.end), FEATURE_DIM)
-    tensor = torch.from_numpy(host_tensor).type(torch.float32).share_memory_()
+    host_tensor = host_tensor.astype(np.float16)
+    tensor = torch.from_numpy(host_tensor)
 
 
     # Decide Range Information
@@ -97,7 +98,7 @@ if __name__ == "__main__":
     buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, tensor.shape[1]]
     pipe_param = PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
-    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints_list, pipe_param, buffer_shape, cached_range)
+    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints_list, pipe_param, buffer_shape, cached_range, dtype=tensor.dtype)
     dist_tensor.from_cpu_tensor(tensor, dist_helper=dist_helper, server_param=server_param, device_param=device_param)
 
 
