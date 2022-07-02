@@ -98,7 +98,7 @@ if __name__ == "__main__":
     buffer_shape = [np.prod(config.SAMPLE_PARAM) * config.BATCH_SIZE, tensor.shape[1]]
     pipe_param = PipeParam(config.QP_NUM, config.CTX_POLL_BATCH, config.TX_DEPTH, config.POST_LIST_SIZE)
 
-    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints_list, pipe_param, buffer_shape, cached_range)
+    dist_tensor = DistTensorPGAS(args.server_rank, tensor_endpoints_list, pipe_param, buffer_shape, cached_range, dtype=tensor.dtype)
     dist_tensor.from_cpu_tensor(tensor, dist_helper=dist_helper, server_param=server_param, device_param=device_param)
 
 

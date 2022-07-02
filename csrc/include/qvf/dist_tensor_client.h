@@ -137,7 +137,7 @@ class DistTensorClient {
                  torch::Tensor& local_offsets,
                  torch::Tensor& remote_offsets) {
     QUIVER_FEATURE_ASSERT(
-        reinterpret_cast<uint64_t>(res_tensor.data_ptr<float>()) ==
+        reinterpret_cast<uint64_t>(res_tensor.data_ptr()) ==
             tensor_buffer->getAddress(),
         "Result Tensor is not created from registered buffer");
 

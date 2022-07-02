@@ -179,6 +179,7 @@ def train(rank, process_rank_base, world_size, args, dataset, g, feats, paper_of
         for i, (input_nodes, output_nodes, mfgs) in enumerate(tqdm.tqdm(valid_dataloader)):
             with torch.no_grad():
                 mfgs = [g.to(device_rank) for g in mfgs]
+                mfgs[0].srcdata['x'] = feats[input_nodes].type(torch.float32)
                 x = mfgs[0].srcdata['x']
                 y = mfgs[-1].dstdata['y']
                 y_hat = model(mfgs, x)
