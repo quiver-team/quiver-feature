@@ -39,7 +39,7 @@ The validation accuracy is 0.680. We do not have ground truth test labels so we 
 
 With 2 machines and 1 GPU per machine, we need 2 minutes 10 seconds to train and 15 seconds to validate for each epoch. This is 3x faster than [DGL's performance result](https://github.com/dmlc/dgl/tree/master/examples/pytorch/ogb_lsc/MAG240M).
 
-From logs we can see that most of training time is spended on model computation.
+From logs we can see that most of the training time of each iteration is spended on model computation.
 
     Avg_Sample: 0.0051s, Avg_Feature: 0.0176s, Avg_Model: 0.1801s, Avg_Feature_BandWidth = 14588.4937 MB/s
 
