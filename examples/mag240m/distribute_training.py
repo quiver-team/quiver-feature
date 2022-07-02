@@ -128,7 +128,7 @@ def train(rank, process_rank_base, world_size, args, dataset, g, feats, paper_of
 
     train_dataloader = torch.utils.data.DataLoader(
         train_collator.dataset,
-        batch_size=1024,
+        batch_size=config.BATCH_SIZE,
         collate_fn=train_collator.collate,
         num_workers=4,
         sampler=train_sampler
@@ -136,7 +136,7 @@ def train(rank, process_rank_base, world_size, args, dataset, g, feats, paper_of
 
     valid_dataloader = torch.utils.data.DataLoader(
         valid_collator.dataset,
-        batch_size=1024,
+        batch_size=config.BATCH_SIZE,
         collate_fn=valid_collator.collate,
         num_workers=2,
         sampler=valid_sampler
@@ -232,11 +232,11 @@ def test(args, dataset, g, feats, paper_offset):
     label = dataset.paper_label
 
     print('Initializing data loader...')
-    sampler = dgl.dataloading.MultiLayerNeighborSampler([160, 160])
+    sampler = dgl.dataloading.MultiLayerNeighborSampler(config.SAMPLE_PARAM)
     valid_collator = ExternalNodeCollator(g, valid_idx, sampler, paper_offset, feats, label)
     valid_dataloader = torch.utils.data.DataLoader(
         valid_collator.dataset,
-        batch_size=16,
+        batch_size=config.BATCH_SIZE,
         shuffle=False,
         drop_last=False,
         collate_fn=valid_collator.collate,
@@ -281,6 +281,7 @@ def test(args, dataset, g, feats, paper_offset):
     for i, (input_nodes, output_nodes, mfgs) in enumerate(tqdm.tqdm(test_dataloader)):
         with torch.no_grad():
             mfgs = [g.to('cuda') for g in mfgs]
+            mfgs[0].srcdata['x'] = feats[input_nodes].type(torch.float32)
             x = mfgs[0].srcdata['x']
             y = mfgs[-1].dstdata['y']
             y_hat = model(mfgs, x)
@@ -326,6 +327,8 @@ if __name__ == '__main__':
     dist_helper = DistHelper(config.MASTER_IP, config.HLPER_PORT, args.server_world_size, args.server_rank)
     tensor_endpoints = dist_helper.exchange_tensor_endpoints_info(local_range)
 
+    print(tensor_endpoints)
+
     print(f"[Server_Rank]: {args.server_rank}:\tBegin To Create DistTensorPGAS")
     device_param = DistTensorDeviceParam(device_list=list(range(args.device_per_node)), device_cache_size="30G", cache_policy="device_replicate")
     server_param = DistTensorServerParam(port_num=config.PORT_NUMBER, server_world_size=args.server_world_size)
@@ -344,3 +347,5 @@ if __name__ == '__main__':
     mp.spawn(train, args=(process_rank_base, world_size, args, dataset, g, dist_tensor, paper_offset), nprocs=args.device_per_node)
 
     test(args, dataset, g, dist_tensor, paper_offset)
+
+    dist_helper.sync_all()
