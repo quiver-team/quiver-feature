@@ -2,7 +2,7 @@
 
 Distributed training setting on MAG240M dataset is almost the same as the [official example in DGL](https://github.com/dmlc/dgl/tree/master/examples/pytorch/ogb_lsc/MAG240M) except that we use `Quiver-Feature` for distributed feature collection.
 
-Our implementation is much faster than DGL's offical example while achieved similar accuracy.
+Our implementation is much faster than DGL's offical example while achieving similar accuracy.
 
 # Data Preprocess & Partition
 
@@ -45,4 +45,4 @@ From logs we can see that most of the training time of each iteration is spended
 
 # Hardware configurations
 
-We have 2 machines, each have 377G memory and they are connected by 100Gbps IB. Running training script will consume around 256GB memory.
+We have 2 machines, each have 377G memory and they are connected with 100Gbps IB. Running training script will consume around 256GB memory.
